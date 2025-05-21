@@ -34,7 +34,7 @@ Run ``setup.sh`` to quickly create a conda environment that contains the package
 . setup.sh
 ```
 
-You can also create a new conda environment and install the required dependencies by running
+Or you can also create a new conda environment and install the required dependencies by running
 ```
 conda env create -f environment.yml
 conda activate MindPilot
