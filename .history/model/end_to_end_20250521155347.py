@@ -57,7 +57,7 @@ parser.add_argument('--lr', type=float, default=1e-5)
 parser.add_argument('--weight_decay', type=float, default=0.)
 parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--save_trained_models', type=bool, default=True)
-parser.add_argument('--project_dir', default='/mnt/dataset0/jh/eeg_encoding', type=str)
+parser.add_argument('--project_dir', default='/mnt/dataset0/jiahua/eeg_encoding', type=str)
 args = parser.parse_args()
 
 print('>>> End-to-end encoding <<<')
