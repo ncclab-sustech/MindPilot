@@ -1,6 +1,6 @@
 <div align="center">
 
-<h2 style="border-bottom: 1px solid lightgray;">MindPilot: Closed-Loop Visual Stimulation Optimization with Black-Box EEG-Guided Diffusion
+<h2 style="border-bottom: 1px solid lightgray;">MindPilot: Closed-loop Visual Stimulation Optimization for Brain Modulation with EEG-guided Diffusion
 </h2>
 
 <!-- Badges and Links Section -->
@@ -12,10 +12,10 @@
 
 </div>
 
-MindPilot: Closed-Loop Visual Stimulation Optimization with Black-Box EEG-Guided Diffusion
+We present a closed-loop visual stimulation optimization framework for brain modulation. Both simulation and human EEG experiments demonstrate significant improvements.
 
 <!--  -->
-<img src="fig-conceptualization_00.png" alt="fig-genexample" style="max-width: 80%; height: auto;"/>  
+<img src="fig-conceptualization_00.png" alt="fig-genexample" style="max-width: 70%; height: auto;"/>  
 
 The conceptualization of MindPilot.
 
@@ -34,7 +34,7 @@ Run ``setup.sh`` to quickly create a conda environment that contains the package
 . setup.sh
 ```
 
-You can also create a new conda environment and install the required dependencies by running
+Or you can also create a new conda environment and install the required dependencies by running
 ```
 conda env create -f environment.yml
 conda activate MindPilot
@@ -45,9 +45,9 @@ conda activate MindPilot
 To download the raw data，you can follow：
 Dataset | Download path| Dataset | Download path
 :---: | :---:|:---: | :---:
-THINGS-EEG1 |  [Download](https://openneuro.org/datasets/ds003825/versions/1.1.0) | EmoStimSet | [Download](https://drive.google.com/file/d/1CkzvACUJkv_njNSpo85IIrdnAd5joicy/view?usp=share_link)
-<!-- We will release the processed data (such as THINGS-EEG1, THINGS-EEG2, THINGS-MEG, THINGS-fMRI) on [Huggingface], which can be directly used for training.
- -->
+
+THINGS-EEG2 | [Download](https://osf.io/3jk45/) | EmoStimSet | [Download](https://drive.google.com/file/d/1CkzvACUJkv_njNSpo85IIrdnAd5joicy/view?usp=share_link)
+<!-- We will release the processed data (such as THINGS-EEG1, THINGS-EEG2, THINGS-MEG, THINGS-fMRI) on [Huggingface], which can be directly used for training.-->
 
 
 <!-- ## Quick training and test  -->
@@ -55,9 +55,22 @@ THINGS-EEG1 |  [Download](https://openneuro.org/datasets/ds003825/versions/1.1.0
 
 
 #### 1.Training readout model
-
-
+Switch between different model types such as **'alexnet'** or **'cornet_s'** to train different Readout Models.
+```bash
+python end_to_end.py --dnn alexnet --sub 10 --modeled_time_points all --pretrained False \
+    --epochs 50 --lr 1e-5 --weight_decay 0. --batch_size 64 --save_trained_models True \
+    --project_dir eeg_encoding/
+```
 #### 2.Interactive searching
+Run the notebook to perform online interactive searching:
 
+```bash
+python experiments/exp-interactive_search.ipynb
+```
 
 #### 3.Heuristic generation
+Run the notebook to perform online heuristic generation:
+
+```bash
+python experiments/exp-heuristic_generation_with_guidance_anyfeature.ipynb
+```
