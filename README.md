@@ -45,7 +45,9 @@ conda activate MindPilot
 To download the raw data，you can follow：
 Dataset | Download path| Dataset | Download path
 :---: | :---:|:---: | :---:
-THINGS-EEG2 |  [Download](https://osf.io/3jk45/) 
+
+THINGS-EEG2 | [Download](https://osf.io/3jk45/) | EmoStimSet | [Download](https://drive.google.com/file/d/1CkzvACUJkv_njNSpo85IIrdnAd5joicy/view?usp=share_link)
+<!-- We will release the processed data (such as THINGS-EEG1, THINGS-EEG2, THINGS-MEG, THINGS-fMRI) on [Huggingface], which can be directly used for training.-->
 
 
 <!-- ## Quick training and test  -->
