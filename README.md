@@ -45,7 +45,7 @@ conda activate MindPilot
 To download the raw data，you can follow：
 Dataset | Download path| Dataset | Download path
 :---: | :---:|:---: | :---:
-THINGS-EEG1 |  [Download](https://openneuro.org/datasets/ds003825/versions/1.1.0) | ArtPhoto | [Download](https://www.imageemotion.org) 
+THINGS-EEG2 |  [Download](https://osf.io/3jk45/) | ArtPhoto | [Download](https://www.imageemotion.org) 
 GAPED | [Download](https://www.unige.ch/cisa/research/materials-and-online-research/research-material/) | EmoSet | [Download](https://vcc.tech/EmoSet)
 <!-- We will release the processed data (such as THINGS-EEG1, THINGS-EEG2, THINGS-MEG, THINGS-fMRI) on [Huggingface], which can be directly used for training.-->
 
@@ -60,6 +60,7 @@ python end_to_end.py --dnn alexnet --sub 10 --modeled_time_points all --pretrain
     --epochs 50 --lr 1e-5 --weight_decay 0. --batch_size 64 --save_trained_models True \
     --project_dir eeg_encoding/
 ```
+
 #### 2.Interactive searching
 Run the notebook to perform online interactive searching:
 
