@@ -15,11 +15,11 @@
 We present a closed-loop visual stimulation optimization framework for brain modulation. Both simulation and human EEG experiments demonstrate significant improvements.
 
 <!--  -->
-<img src="fig-conceptualization_00.png" alt="fig-genexample" style="max-width: 70%; height: auto;"/>  
+<img src="fig-conceptualization.png" alt="fig-genexample" style="max-width: 70%; height: auto;"/>  
 
 The conceptualization of MindPilot.
 
-<img src="fig-framework_00.png" alt="Framework" style="max-width: 70%; height: auto;"/>
+<img src="fig-framework.png" alt="Framework" style="max-width: 70%; height: auto;"/>
 
 Overall Architecture of MindPilot.
 

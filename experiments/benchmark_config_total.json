@@ -1,0 +1,126 @@
+{
+  "device": "cuda",
+  "output_dir": "/home/ldy/Workspace/Closed_loop_optimizing/benchmark_results_total",
+  
+  "data": {
+    "embed_dir": "/home/ldy/Workspace/Closed_loop_optimizing/data/clip_embed/2025-09-21",
+    "image_dir": "/home/ldy/Workspace/Closed_loop_optimizing/test_images"
+  },
+  
+  "target_selection": {
+    "num_targets": 10,
+    "random_seed": 42,
+    "comment": "Randomly sample num_targets from the image pool to ensure fair evaluation."
+  },
+  
+  "methods": {
+    "pseudo_model": {
+      "enabled": true,
+      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "image_dir": "/home/ldy/Workspace/Closed_loop_optimizing/test_images",
+      "subject": "sub-01",
+      "comment": "Pseudo Model with offline optimization"
+    },
+    
+    "heuristic_closedloop": {
+      "enabled": true,
+      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "image_dir": "/home/ldy/Workspace/Closed_loop_optimizing/test_images",
+      "subject": "sub-01",
+      "num_fusions_per_round": 2,
+      "top_k_greedy": 20,
+      "initial_sample_size_closedloop": 5,
+      "comment": "Heuristic Closed-Loop: Auto-calculates optimal loops from budget (iterative fusion + greedy sampling)"
+    },
+    
+    "ddpo": {
+      "enabled": false,
+      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "subject": "sub-01",
+      "n_epochs": 1,
+      "batch_size": 2,
+      "learning_rate": 3e-5,
+      "clip_range": 1e-4,
+      "adv_clip_max": 5,
+      "num_inference_steps": 8,
+      "comment": "DDPO with PPO algorithm"
+    },
+    
+    "dpok": {
+      "enabled": false,
+      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "subject": "sub-01",
+      "n_epochs": 1,
+      "batch_size": 2,
+      "learning_rate": 3e-5,
+      "kl_ratio": 0.01,
+      "num_inference_steps": 8,
+      "comment": "DPOK with KL divergence constraint"
+    },
+    
+    "d3po": {
+      "enabled": false,
+      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "subject": "sub-01",
+      "n_epochs": 1,
+      "batch_size": 2,
+      "learning_rate": 3e-5,
+      "beta": 0.1,
+      "eps": 0.1,
+      "num_inference_steps": 8,
+      "comment": "D3PO with pairwise preference learning (requires even batch_size)"
+    },
+    
+    "bayesian_opt": {
+      "enabled": true,
+      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "subject": "sub-01",
+      "acquisition": "ucb",
+      "kappa": 2.5,
+      "xi": 0.01,
+      "n_initial_points": 10,
+      "comment": "Bayesian Optimization with Gaussian Process"
+    },
+    
+    "cma_es": {
+      "enabled": true,
+      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "subject": "sub-01",
+      "population_size": 8,
+      "sigma": 0.5,
+      "comment": "CMA-ES evolution strategy"
+    }
+  },
+  
+  "experiments": {
+    "exp1": {
+      "enabled": true,
+      "name": "Single Target Reconstruction - 7 Methods Comparison",
+      "sample_budget": 5,
+      "random_seeds": [42]
+    },
+    
+    "exp2": {
+      "enabled": false,
+      "name": "Sample Efficiency Analysis",
+      "sample_budgets": [10, 20, 30, 50, 100],
+      "random_seeds": [42],
+      "num_targets": 5
+    }
+  },
+  
+  "visualization": {
+    "create_boxplot": true,
+    "create_scatter": true,
+    "save_images": true,
+    "dpi": 300
+  }
+}
+
