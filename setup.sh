@@ -4,8 +4,8 @@
 
 set -e
 
-conda create -n FLORA python=3.10.8 -y
-conda activate FLORA
+conda create -n MindPilot python=3.10.8 -y
+conda activate MindPilot
 
 conda install numpy matplotlib tqdm scikit-image jupyterlab -y
 conda install -c conda-forge accelerate -y
@@ -30,3 +30,7 @@ pip install reformer_pytorch
 pip install mne
 pip install wandb
 pip install einops
+
+echo "Environment 'MindPilot' created successfully!"
+echo "To activate the environment, run: conda activate MindPilot"
+

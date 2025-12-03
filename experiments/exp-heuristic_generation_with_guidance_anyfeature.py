@@ -1,5 +1,9 @@
 import os
 
+proxy="10.16.11.87:7890"
+os.environ['http_proxy'] = proxy
+os.environ['https_proxy'] = proxy
+
 import numpy as np
 import torch
 import sys
