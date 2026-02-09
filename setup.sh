@@ -20,7 +20,7 @@ pip install diffusers==0.24.0
 
 pip install braindecode==0.8.1
 
-pip install torchvision==0.15.2 torch==2.0.1
+pip install torchvision==0.20.0 torch==2.5.0
 
 pip install info-nce-pytorch==0.1.0
 pip install pytorch-msssim

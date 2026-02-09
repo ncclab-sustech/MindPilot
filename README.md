@@ -4,10 +4,11 @@
 
 <h3>Closed-loop Visual Stimulation Optimization for Brain Modulation with EEG-guided Diffusion</h3>
 
-<!-- Badges
+[![Paper](https://img.shields.io/badge/Paper-ICLR%202026-blue.svg)](https://openreview.net/forum?id=7jdmXx869Q)
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0.1-red.svg)](https://pytorch.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) -->
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.5.0-red.svg)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Dataset](https://img.shields.io/badge/🤗%20Dataset-MindPilot-yellow.svg)](https://huggingface.co/datasets/LidongYang/Mindpilot)
 
 ---
 
@@ -15,7 +16,7 @@
 
 ## 📖 Overview
 
-**MindPilot** is a closed-loop visual stimulation optimization framework for brain modulation. By combining EEG signals with diffusion models, we generate optimized visual stimuli that can effectively modulate brain activity. Both simulation and human EEG experiments demonstrate significant improvements in brain modulation performance.
+We propose **MindPilot**, which employs a simple black-box optimization approach to achieve EEG-guided closed-loop visual stimulation optimization (supporting offline learning data and experience replay) for regulating the brain activity of subjects. This paper addresses three problems: high-noise non-invasive brain signals; the non-differentiability of brain input and output; and the variability of brain activity states.
 
 <!-- ### ✨ Key Features
 
@@ -45,49 +46,8 @@
 <img src="fig-framework.png" alt="Framework" width="90%"/>
 <p><i>Overall architecture of MindPilot framework</i></p>
 </div>
-<!-- 
-The framework consists of three main components:
-1. **EEG Readout Model**: Predicts brain responses from visual features
-2. **Optimization Engine**: Searches/generates optimized visual stimuli
-3. **Validation System**: Real-time EEG recording and validation -->
-
 ---
 
-<!-- ## 📁 Project Structure
-
-```
-MindPilot/
-├── model/                          # Core models
-│   ├── end_to_end.py              # EEG readout model training
-│   ├── pseudo_target_model.py     # Target brain response modeling
-│   ├── modulation_utils.py        # Brain modulation utilities
-│   └── subject_layers/            # Subject-specific neural layers
-├── experiments/                    # Experiment scripts
-│   ├── exp-interactive_search.ipynb              # Interactive search demo
-│   ├── exp-heuristic_generation_*.ipynb         # Heuristic generation demos
-│   ├── benchmark_framework_total.py             # Benchmark evaluation
-│   └── util.py                                   # Experiment utilities
-├── client/                         # Real-time client for human experiments
-│   ├── client.py                  # EEG client interface
-│   ├── neuracle_api.py            # Neuracle EEG device API
-│   └── pygame_utils.py            # Visual stimuli presentation
-├── server/                         # Server for online experiments
-│   └── improved_experiment.py     # Experiment control server
-├── Interactive_search/             # Visualization for interactive search
-├── Heuristic_generation/          # Visualization for heuristic generation
-└── environment.yml                # Conda environment file
-``` -->
-<!-- 
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **OS**: Linux (Ubuntu 18.04+ recommended)
-- **GPU**: NVIDIA GPU with CUDA support (at least 16GB VRAM recommended)
-- **CUDA**: Version 11.7+
-- **Conda**: Miniconda or Anaconda -->
 
 ### Installation
 
@@ -111,11 +71,25 @@ conda activate MindPilot
 
 ---
 
-## 📊 Dataset Preparation
+## 📦 Pretrained Weights & Datasets
 
-### Download Datasets
+We provide pretrained model weights and preprocessed datasets on Hugging Face:
 
-Download the required datasets from the following sources:
+🤗 **[https://huggingface.co/datasets/LidongYang/Mindpilot](https://huggingface.co/datasets/LidongYang/Mindpilot)**
+
+You can download using the Hugging Face CLI:
+
+```bash
+# Install huggingface_hub if not already installed
+pip install huggingface_hub
+
+# Download all files
+huggingface-cli download LidongYang/Mindpilot --repo-type dataset --local-dir ./data
+```
+
+### External Datasets
+
+Download the additional datasets from the following sources:
 
 | Dataset | Description | Download Link |
 |:-------:|:------------|:--------------|
@@ -196,11 +170,19 @@ python client/client.py --server_ip 192.168.1.100 --port 5000
 
 ## 📜 License
 
-This project will be released under an open-source license upon paper acceptance.
+This project is licensed under the [MIT License](LICENSE).
 
----
+## 📝 Citation
 
-<div align="center">
-<p><i>🚧 This is an anonymous repository for peer review. Full code and documentation will be released upon paper acceptance. 🚧</i></p>
-</div>
+If you find this work useful, please cite our paper:
 
+```bibtex
+@inproceedings{
+2026mindpilot,
+title={MindPilot: Closed-loop Visual Stimulation Optimization for Brain Modulation with {EEG}-guided Diffusion},
+author={Dongyang Li, Kunpeng Xie, Mingyang Wu, Yiwei Kong, Jiahua Tang, Haoyang Qin, Chen Wei, Quanying Liu },
+booktitle={The Fourteenth International Conference on Learning Representations},
+year={2026},
+url={https://openreview.net/forum?id=7jdmXx869Q}
+}
+```
