@@ -16,9 +16,9 @@
 
 ## 📰 News
 
-- 🚀 **2025.03.08**: We update the codebase and [Hugging Face](https://huggingface.co/datasets/LidongYang/Mindpilot) resources.
-- 📄 **2025.02.11**: We update the [arXiv](https://arxiv.org/abs/2602.10552) paper and release the code repository.
-- 🎉 **2025.01.26**: Our paper is accepted to [ICLR 2026](https://openreview.net/forum?id=7jdmXx869Q).
+- 🚀 **2026.03.08**: We update the codebase and [Hugging Face](https://huggingface.co/datasets/LidongYang/Mindpilot) resources.
+- 📄 **2026.02.11**: We update the [arXiv](https://arxiv.org/abs/2602.10552) paper and release the code repository.
+- 🎉 **2026.01.26**: Our paper is accepted to [ICLR 2026](https://openreview.net/forum?id=7jdmXx869Q).
 
 ## 📖 Overview
 
