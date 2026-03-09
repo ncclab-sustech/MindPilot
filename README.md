@@ -178,11 +178,31 @@ python client/client.py --server_ip 192.168.1.100 --port 5000
 
 This project is licensed under the [MIT License](LICENSE).
 
+## 😺 Acknowledgement
+
+We sincerely thank the following works and their authors for providing valuable resources that supported this project:
+
+- The [THINGS-EEG2](https://github.com/gifale95/eeg_encoding) dataset — *"[A large and rich EEG dataset for modeling human visual object recognition](https://doi.org/10.1016/j.neuroimage.2022.119754)"* by Alessandro T. Gifford, Kshitij Dwivedi, Gemma Roig, and Radoslaw M. Cichy.
+- [FAST-DiReCT](https://github.com/kimyong95/guide-stable-diffusion/tree/fast-direct) — *"[Query-Efficient Online Black-box Guidance for Diffusion-Model Target Generation](https://openreview.net/forum?id=OmpTdjl7RV)"* by Kim Yong Tan, Yueming Lyu, Ivor Tsang, and Yew-Soon Ong.
+- [D3PO](https://github.com/yk7333/D3PO) — *"[Using Human Feedback to Fine-tune Diffusion Models without Any Reward Model](https://arxiv.org/abs/2311.13231)"*.
+- [DDPO](https://github.com/kvablack/ddpo-pytorch) — *"[Training Diffusion Models with Reinforcement Learning](https://arxiv.org/abs/2305.13301)"*.
+- [DPOK](https://github.com/google-research/google-research/tree/master/dpok) — *"[Reinforcement Learning for Fine-tuning Text-to-Image Diffusion Models](https://arxiv.org/abs/2305.16381)"*.
+
+📬 Contact [Dongyang Li](https://dongyangli-del.github.io/) if you have any questions or suggestions.
+
 ## 📝 Citation
 
 If you find this work useful, please cite our paper:
 
 ```bibtex
+@article{li2024visual,
+  title={Visual Decoding and Reconstruction via EEG Embeddings with Guided Diffusion},
+  author={Li, Dongyang and Wei, Chen and Li, Shiying and Zou, Jiachen and Liu, Quanying},
+  journal={Advances in Neural Information Processing Systems},
+  volume={37},
+  pages={102822--102864},
+  year={2024}
+}
 @inproceedings{
 2026mindpilot,
 title={MindPilot: Closed-loop Visual Stimulation Optimization for Brain Modulation with {EEG}-guided Diffusion},
