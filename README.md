@@ -174,21 +174,6 @@ python server/improved_experiment.py --port 5000
 python client/client.py --server_ip 192.168.1.100 --port 5000
 ```
 
-## 📜 License
-
-This project is licensed under the [MIT License](LICENSE).
-
-## 😺 Acknowledgement
-
-We sincerely thank the following works and their authors for providing valuable resources that supported this project:
-
-- The [THINGS-EEG2](https://github.com/gifale95/eeg_encoding) dataset — *"[A large and rich EEG dataset for modeling human visual object recognition](https://doi.org/10.1016/j.neuroimage.2022.119754)"* by Alessandro T. Gifford, Kshitij Dwivedi, Gemma Roig, and Radoslaw M. Cichy.
-- [FAST-DiReCT](https://github.com/kimyong95/guide-stable-diffusion/tree/fast-direct) — *"[Query-Efficient Online Black-box Guidance for Diffusion-Model Target Generation](https://openreview.net/forum?id=OmpTdjl7RV)"* by Kim Yong Tan, Yueming Lyu, Ivor Tsang, and Yew-Soon Ong.
-- [D3PO](https://github.com/yk7333/D3PO) — *"[Using Human Feedback to Fine-tune Diffusion Models without Any Reward Model](https://arxiv.org/abs/2311.13231)"*.
-- [DDPO](https://github.com/kvablack/ddpo-pytorch) — *"[Training Diffusion Models with Reinforcement Learning](https://arxiv.org/abs/2305.13301)"*.
-- [DPOK](https://github.com/google-research/google-research/tree/master/dpok) — *"[Reinforcement Learning for Fine-tuning Text-to-Image Diffusion Models](https://arxiv.org/abs/2305.16381)"*.
-
-📬 Contact [Dongyang Li](https://dongyangli-del.github.io/) if you have any questions or suggestions.
 
 ## 📝 Citation
 
@@ -212,3 +197,19 @@ year={2026},
 url={https://openreview.net/forum?id=7jdmXx869Q}
 }
 ```
+
+## 😺 Acknowledgement
+
+We sincerely thank the following works and their authors for providing valuable resources that supported this project:
+
+- The [THINGS-EEG2](https://github.com/gifale95/eeg_encoding) dataset — *"[A large and rich EEG dataset for modeling human visual object recognition](https://doi.org/10.1016/j.neuroimage.2022.119754)"* by Alessandro T. Gifford, Kshitij Dwivedi, Gemma Roig, and Radoslaw M. Cichy.
+- [FAST-DiReCT](https://github.com/kimyong95/guide-stable-diffusion/tree/fast-direct) — *"[Query-Efficient Online Black-box Guidance for Diffusion-Model Target Generation](https://openreview.net/forum?id=OmpTdjl7RV)"* by Kim Yong Tan, Yueming Lyu, Ivor Tsang, and Yew-Soon Ong.
+- [D3PO](https://github.com/yk7333/D3PO) — *"[Using Human Feedback to Fine-tune Diffusion Models without Any Reward Model](https://arxiv.org/abs/2311.13231)"* by Kai Yang, Jian Tao, Jiafei Lyu, Chunjiang Ge, Jiaxin Chen, Qimai Li, Weihan Shen, Xiaolong Zhu, Xiu Li.
+- [DDPO](https://github.com/kvablack/ddpo-pytorch) — *"[Training Diffusion Models with Reinforcement Learning](https://arxiv.org/abs/2305.13301)"* by Kevin Black, Michael Janner, Yilun Du, Ilya Kostrikov, Sergey Levine.
+- [DPOK](https://github.com/google-research/google-research/tree/master/dpok) — *"[Reinforcement Learning for Fine-tuning Text-to-Image Diffusion Models](https://arxiv.org/abs/2305.16381)"* by Ying Fan, Olivia Watkins, Yuqing Du, Hao Liu, Moonkyung Ryu, Craig Boutilier, Pieter Abbeel, Mohammad Ghavamzadeh, Kangwook Lee, Kimin Lee.
+
+📬 Contact [Dongyang Li](https://dongyangli-del.github.io/) if you have any questions or suggestions.
+Kevin Black, Michael Janner, Yilun Du, Ilya Kostrikov, Sergey Levine.
+## 📜 License
+
+This project is licensed under the [MIT License](LICENSE).
