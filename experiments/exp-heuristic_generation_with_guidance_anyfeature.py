@@ -50,27 +50,27 @@ generator = Generator4Embeds(device=device)
 pipe = generator.pipe
 
 
-# 配置图片和embed目录
+# Configure image and embed directories
 image_dir = '/home/ldy/Workspace/Closed_loop_optimizing/test_images'
 embed_dir = '/home/ldy/Workspace/Closed_loop_optimizing/data/clip_embed/2025-09-21'
 
-# 获取所有图片和embed路径，排序保证一一对应
+# Get all image and embed paths, sorted to ensure one-to-one correspondence
 image_list = sorted([f for f in os.listdir(image_dir) if f.lower().endswith(('.jpg','.png','.jpeg'))])
 embed_list = sorted([f for f in os.listdir(embed_dir) if f.endswith('_embed.pt')])
 
 
 
 def main_loop(target_idx):
-    assert target_idx < len(image_list), f"target_idx超出图片数量范围({len(image_list)})"
-    assert target_idx < len(embed_list), f"target_idx超出embed数量范围({len(embed_list)})"
+    assert target_idx < len(image_list), f"target_idx exceeds image count range ({len(image_list)})"
+    assert target_idx < len(embed_list), f"target_idx exceeds embed count range ({len(embed_list)})"
 
     target_image_path = os.path.join(image_dir, image_list[target_idx])
     target_eeg_embed_path = os.path.join(embed_dir, embed_list[target_idx])
-    print(f"当前索引: {target_idx}")
-    print(f"图片: {target_image_path}")
+    print(f"Current index: {target_idx}")
+    print(f"Image: {target_image_path}")
     print(f"eeg_embed: {target_eeg_embed_path}")
 
-    # 其余参数保持不变
+    # Remaining parameters unchanged
     sub = 'sub-01'
     fs = 250
     selected_channel_idxes = slice(None)
@@ -206,10 +206,10 @@ def main_loop(target_idx):
 
     def reward_function_clip_embed_image(pil_image, target_feature):
         """
-        生成与某张图片对应的脑电信号，并与 groundtruth 进行相似度计算
-        :param image: 图片特征向量 [1024]
-        :param groundtruth_eeg: groundtruth 的特征向量 [1024]
-        :return: EEG信号与groundtruth的相似度
+        Generate EEG signals corresponding to an image and compute similarity with groundtruth.
+        :param image: Image feature vector [1024]
+        :param groundtruth_eeg: Groundtruth feature vector [1024]
+        :return: Similarity between EEG signal and groundtruth
         """    
         tensor_images = [preprocess_train(pil_image)]    
         with torch.no_grad():
@@ -223,10 +223,10 @@ def main_loop(target_idx):
 
     def reward_function_clip_embed(eeg, eeg_model, target_feature, sub, dnn):
         """
-        生成与某张图片对应的脑电信号，并与 groundtruth 进行相似度计算
-        :param image: 图片特征向量 [1024]
-        :param groundtruth_eeg: groundtruth 的特征向量 [1024]
-        :return: EEG信号与groundtruth的相似度
+        Generate EEG signals corresponding to an image and compute similarity with groundtruth.
+        :param image: Image feature vector [1024]
+        :param groundtruth_eeg: Groundtruth feature vector [1024]
+        :return: Similarity between EEG signal and groundtruth
         """    
         eeg_feature = get_eeg_features(eeg_model, torch.tensor(eeg).unsqueeze(0), device, sub)    
         similarity = torch.nn.functional.cosine_similarity(eeg_feature.to(device), target_feature.to(device))
@@ -365,7 +365,7 @@ def main_loop(target_idx):
 
                 images = self.latents_to_images(latents)         
 
-                # 新增：保存每步生成的图片
+                # Save generated images at each step
                 if img_save_dir is not None:
                     for img in images:
                         img.save(os.path.join(img_save_dir, f"img_{img_counter:03d}.png"))
@@ -405,9 +405,9 @@ def main_loop(target_idx):
 
 
     def fusion_image_to_images(Generator, img_embeds, rewards, device, scale, save_path=None):        
-            # 随机选择两个不同的索引
+            # Randomly select two different indices
         idx1, idx2 = random.sample(range(len(img_embeds)), 2)
-        # 获取对应的嵌入向量并添加批次维度
+        # Get corresponding embedding vectors and add batch dimension
         embed1, embed2 = img_embeds[idx1].unsqueeze(0), img_embeds[idx2].unsqueeze(0)
         embed_len = embed1.size(1)
         start_idx = random.randint(0, embed_len - scale - 1)
@@ -482,60 +482,60 @@ def main_loop(target_idx):
 
     def visualize_top_images(images, similarities, save_folder, iteration):
         """
-        使用 matplotlib 按相似度顺序显示选中的图片
-        :param image_paths: 图片路径列表
-        :param similarities: 每张图片的相似度列表
+        Display selected images sorted by similarity using matplotlib.
+        :param image_paths: List of image paths
+        :param similarities: List of similarity scores for each image
         """
-        # 将图片路径和相似度结合，并按相似度降序排序
+        # Combine images and similarities, sort by similarity in descending order
         image_similarity_pairs = sorted(zip(images, similarities), key=lambda x: x[1], reverse=True)
 
-        # 拆分排序后的图片路径和相似度
+        # Unzip sorted images and similarities
         sorted_images, sorted_similarities = zip(*image_similarity_pairs)
 
-        # 绘制图像
+        # Plot images
         fig, axes = plt.subplots(1, len(sorted_images), figsize=(15, 5))
         for i, image in enumerate(sorted_images):
             axes[i].imshow(image)
             axes[i].axis('off')
-            axes[i].set_title(f'Similarity: {sorted_similarities[i]:.4f}', fontsize=8)  # 显示相似度
+            axes[i].set_title(f'Similarity: {sorted_similarities[i]:.4f}', fontsize=8)  # Display similarity
         plt.show()
 
-        os.makedirs(save_folder, exist_ok=True)  # 创建文件夹（如果不存在）
+        os.makedirs(save_folder, exist_ok=True)  # Create folder if it doesn't exist
         save_path = os.path.join(save_folder, f"visualization_iteration_{iteration}.png")
-        fig.savefig(save_path, bbox_inches='tight', dpi=300)  # 保存图像文件
+        fig.savefig(save_path, bbox_inches='tight', dpi=300)  # Save image file
         print(f"Visualization saved to {save_path}")
 
     def compute_embed_similarity(img_feature, all_features):
         """
-        计算某张图片与所有其他图片的余弦相似度（结果在0-1之间）
-        :param img_feature: 选中图片的特征向量 [D] 或 [1, D]
-        :param all_features: 所有图片的特征向量 [N, D]
-        :return: 余弦相似度 [N] (范围0-1)
+        Compute cosine similarity between one image and all other images (result in [0, 1]).
+        :param img_feature: Feature vector of the selected image [D] or [1, D]
+        :param all_features: Feature vectors of all images [N, D]
+        :return: Cosine similarities [N] (range 0-1)
         """
-        # 确保输入是浮点类型
+        # Ensure inputs are float type
         img_feature = img_feature.float()
         all_features = all_features.float()
 
-        # 确保特征向量是2D的 [1, D]
+        # Ensure feature vector is 2D [1, D]
         if img_feature.dim() == 1:
             img_feature = img_feature.unsqueeze(0)
 
-        # 检查NaN/Inf值
+        # Check for NaN/Inf values
         assert torch.isfinite(img_feature).all(), "img_feature contains NaN/Inf values"
         assert torch.isfinite(all_features).all(), "all_features contains NaN/Inf values"    
 
-        # 归一化特征向量
+        # Normalize feature vectors
         img_feature = F.normalize(img_feature, p=2, dim=1)
         all_features = F.normalize(all_features, p=2, dim=1)
 
-        # 计算余弦相似度 [-1,1]
+        # Compute cosine similarity [-1, 1]
         cosine_sim = torch.mm(all_features, img_feature.t()).squeeze(1)
 
-        # 转换到[0,1]范围
-        cosine_sim = (cosine_sim + 1) / 2  # 方法1：线性缩放
-        # cosine_sim = torch.sigmoid(cosine_sim)  # 方法2：sigmoid
+        # Map to [0, 1] range
+        cosine_sim = (cosine_sim + 1) / 2  # Method 1: linear scaling
+        # cosine_sim = torch.sigmoid(cosine_sim)  # Method 2: sigmoid
 
-        # 确保数值稳定性
+        # Ensure numerical stability
         cosine_sim = torch.clamp(cosine_sim, 0.0, 1.0)
 
         return cosine_sim
@@ -562,24 +562,24 @@ def main_loop(target_idx):
     test_set_img_embeds = torch.load("/mnt/dataset1/ldy/Workspace/FLORA/data_preparing/ViT-H-14_features_test.pt")['img_features'].cpu()
 
     # test_set_img_embeds = torch.load("/home/ldy/Workspace/Closed_loop_optimizing/data/clip_embed/open_clip/600_image_embeds.pt").cpu()
-    # 确保基础目录存在
+    # Ensure base directory exists
     os.makedirs(save_folder, exist_ok=True)
     
-    # 创建基于时间戳的目录
+    # Create timestamp-based directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     timestamp_dir = os.path.join(save_folder, timestamp)
     os.makedirs(timestamp_dir, exist_ok=True)
     
-    # 在时间戳目录下查找已存在的实验目录
+    # Find existing experiment directories under the timestamp directory
     existing_exps = [d for d in os.listdir(timestamp_dir) if d.startswith('exp') and d[3:].isdigit()]
     if existing_exps:
-        # 获取最大的实验编号
+        # Get the maximum experiment number
         max_num = max(int(exp[3:]) for exp in existing_exps)
         new_exp_num = max_num + 1
     else:
-        # 如果没有已存在的实验，从1开始
+        # If no existing experiments, start from 1
         new_exp_num = 1
-    # 创建新实验目录
+    # Create new experiment directory
     new_exp_dir = os.path.join(timestamp_dir, f'exp{new_exp_num}')
     os.makedirs(new_exp_dir, exist_ok=True)
     print(f"Created new experiment directory: {new_exp_dir}")
@@ -642,8 +642,8 @@ def main_loop(target_idx):
             # with torch.no_grad():
             #     loop_img_embeds = vlmodel.encode_image(torch.stack([preprocess_train(i) for i in loop_sample_ten]).to(device))
 
-            # 定义要从中随机选择的top K数量
-            TOP_K = 10  # 可以根据需要调整这个值
+            # Define the top K count for random selection
+            TOP_K = 10  # Adjust this value as needed
 
             for img_embed in img_embeds:      
                 available_indices = []
@@ -659,10 +659,10 @@ def main_loop(target_idx):
                 cosine_similarities = compute_embed_similarity(img_embed.to(device), available_features.to(device))    
                 sorted_available_indices = np.argsort(cosine_similarities.cpu())
 
-                # 获取top K的索引（相似度最高的K个）
+                # Get top K indices (K highest similarities)
                 top_indices = sorted_available_indices[-TOP_K:]
 
-                # 从top K中随机选择一个
+                # Randomly select one from top K
                 selected_idx = np.random.choice(top_indices)
                 # print(f"available_paths {len(available_paths)}")            
                 # print(f"available_indices {available_indices}")
@@ -688,14 +688,14 @@ def main_loop(target_idx):
             loop_probabilities = softmax(loop_reward_ten)    
             chosen_rewards, chosen_losses, chosen_images, chosen_eegs = select_from_images(loop_probabilities, loop_reward_ten, loop_loss_ten, loop_sample_ten, loop_eeg_ten, size=4)        
 
-            # 将四个列表按照chosen_rewards的值从大到小排序
+            # Sort all four lists by chosen_rewards in descending order
             combined = list(zip(chosen_rewards, chosen_losses, chosen_images, chosen_eegs))
-            combined.sort(reverse=True, key=lambda x: x[0])  # 按rewards降序排列
+            combined.sort(reverse=True, key=lambda x: x[0])  # Sort by rewards in descending order
 
-            # 解压排序后的数据
+            # Unzip the sorted data
             chosen_rewards, chosen_losses, chosen_images, chosen_eegs = zip(*combined)
 
-            # 如果需要将结果转回列表（因为zip返回的是元组）
+            # Convert results back to lists (since zip returns tuples)
             chosen_rewards = list(chosen_rewards)
             chosen_losses = list(chosen_losses)
             chosen_images = list(chosen_images)
@@ -749,19 +749,19 @@ def main_loop(target_idx):
 
         max_similarity = max(loop_reward_ten)
         max_index = loop_reward_ten.index(max_similarity)
-        corresponding_eeg = loop_eeg_ten[max_index]  # 获取对应的脑电数据
+        corresponding_eeg = loop_eeg_ten[max_index]  # Get corresponding EEG data
 
         if len(history_cs) == 0:
             history_cs.append(max_similarity)
-            history_eeg.append(corresponding_eeg)  # 同时记录脑电数据
+            history_eeg.append(corresponding_eeg)  # Also record EEG data
         else:
             max_history = max(history_cs)
             if max_similarity > max_history:
                 history_cs.append(max_similarity)
-                history_eeg.append(corresponding_eeg)  # 记录新的脑电数据
+                history_eeg.append(corresponding_eeg)  # Record new EEG data
             else:
                 history_cs.append(max_history)
-                history_eeg.append(history_eeg[-1])  # 保持之前的脑电数据
+                history_eeg.append(history_eeg[-1])  # Keep previous EEG data
 
         if len(history_cs) >= 2:
             if history_cs[-1] != history_cs[-2]:

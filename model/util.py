@@ -32,24 +32,24 @@ from CORnet.cornet import CORnet_S
 
 
 # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# # 加载模型、训练时的预处理和特征提取器
+# # Load model, training preprocessor and feature extractor
 # vlmodel, preprocess_train, feature_extractor = open_clip.create_model_and_transforms(
 #     model_name = 'ViT-H-14', pretrained = None, precision='fp32', device=device
 # )
 
-# # 加载你已经下载的权重文件
+# # Load the previously downloaded weight file
 # model_weights_path = "/mnt/repo0/kyw/open_clip_pytorch_model.bin"
 # model_state_dict = torch.load(model_weights_path, map_location=device)
 # vlmodel.load_state_dict(model_state_dict)
 
-# # 将模型设置为评估模式
+# # Set model to evaluation mode
 # vlmodel.eval()
 
-#生成脑电信号模块
-# 定义您的模型结构
+# EEG signal generation module
+# Define your model structure
 # def create_model(device):
 #     model = models.alexnet(pretrained=False)
-#     model.classifier[6] = torch.nn.Linear(4096, 17*250)  # 17通道 × 100时间点 = 1700 输出
+#     model.classifier[6] = torch.nn.Linear(4096, 17*250)  # 17 channels x 100 time points = 1700 outputs
 #     model = model.to(device)
 #     return model
 
@@ -84,139 +84,139 @@ def load_model_endocer(model_path, dnn, device):
 #     model.load_state_dict(checkpoint['best_model'])
 #     model.eval()
 #     return model
-# 加载模型权重
+# Load model weights
 # def load_model_endocer(model_path, device):
-#     model = create_model(device)  # 首先创建模型
+#     model = create_model(device)  # First create the model
 #     checkpoint = torch.load(model_path, map_location=device)
-#     model.load_state_dict(checkpoint['best_model'])  # 加载模型参数
+#     model.load_state_dict(checkpoint['best_model'])  # Load model parameters
 #     model.eval()
 #     return model
 
-# 图像预处理函数
+# Image preprocessing function
 def preprocess_image(image_path, device):
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # 模型接受224x224的图像输入
+        transforms.Resize((224, 224)),  # Model accepts 224x224 image input
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     image = Image.open(image_path).convert('RGB')
-    image_tensor = transform(image).unsqueeze(0).to(device)  # 加入 batch 维度
+    image_tensor = transform(image).unsqueeze(0).to(device)  # Add batch dimension
     return image_tensor
 
-# 生成 EEG 信号函数
+# EEG signal generation function
 def generate_eeg(model, image_tensor, device):
     model.to(device)
     model.eval()
 
     with torch.no_grad():
-        # 输入图像到模型，生成EEG信号
+        # Feed image into model to generate EEG signal
         eeg_output = model(image_tensor).detach().cpu().numpy()
         
-        # 假设模型输出的是 (1, 1700) 的向量，将其重塑为 (17, 100)
+        # Assuming model output is a (1, 1700) vector, reshape to (17, 100)
         eeg_output = np.reshape(eeg_output, (17, 250))
     
     return eeg_output
 
-# 保存 EEG 信号函数
+# Save EEG signal function
 def save_eeg_signal(eeg_signal, save_dir, idx, category):
-    # 确保保存路径存在
+    # Ensure save directory exists
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     
-    file_name = f"{category}_{idx + 1}.npy"  # 文件名带有排序特征
+    file_name = f"{category}_{idx + 1}.npy"  # Filename includes sortable identifier
     file_path = os.path.join(save_dir, file_name)
         
-    # 保存 EEG 信号到 .npy 文件
+    # Save EEG signal to .npy file
     np.save(file_path, eeg_signal)
-    # print(f"EEG 信号已保存至: {file_path}")
+    # print(f"EEG signal saved to: {file_path}")
 
 
 def plot_similarity_range(similarities_per_iteration, save_folder):
     """
-    绘制每轮迭代中的相似度范围图。
-    :param similarities_per_iteration: 每轮迭代中的相似度列表，形状为 [iterations, num_images_per_iteration]
-    :param save_folder: 保存图片的文件夹
+    Plot the similarity range for each iteration.
+    :param similarities_per_iteration: List of similarities per iteration, shape [iterations, num_images_per_iteration]
+    :param save_folder: Folder to save the plot
     """
     plt.figure(figsize=(10, 6))
 
-    num_iterations = len(similarities_per_iteration)  # 迭代次数
+    num_iterations = len(similarities_per_iteration)  # Number of iterations
     iterations = range(1, num_iterations + 1)
 
-    # 计算每轮的平均相似度、最大相似度和最小相似度
+    # Calculate average, max, and min similarity for each iteration
     avg_similarities = [np.mean(similarities) for similarities in similarities_per_iteration]
     max_similarities = [np.max(similarities) for similarities in similarities_per_iteration]
     min_similarities = [np.min(similarities) for similarities in similarities_per_iteration]
 
-    # 绘制误差带 (极差误差带)
+    # Plot error band (range-based error band)
     plt.fill_between(iterations, min_similarities, max_similarities, color='lightblue', alpha=0.5, label='Range (Min-Max)')
 
-    # 绘制相似度均值连线
+    # Plot mean similarity line
     plt.plot(iterations, avg_similarities, color='blue', label='Average Similarity', linewidth=2)
 
-    # 设置边框的线条宽度
-    plt.gca().spines['top'].set_linewidth(0.8)  # 顶部边框
-    plt.gca().spines['right'].set_linewidth(0.8)  # 右边框
-    plt.gca().spines['left'].set_linewidth(0.8)  # 左边框
-    plt.gca().spines['bottom'].set_linewidth(0.8)  # 底部边框
+    # Set border line width
+    plt.gca().spines['top'].set_linewidth(0.8)  # Top border
+    plt.gca().spines['right'].set_linewidth(0.8)  # Right border
+    plt.gca().spines['left'].set_linewidth(0.8)  # Left border
+    plt.gca().spines['bottom'].set_linewidth(0.8)  # Bottom border
 
-    # 设置标签和图例
+    # Set labels and legend
     plt.xlabel('Step', fontsize=14)
     plt.ylabel('Similarity', fontsize=14)
     plt.legend(loc='upper right', fontsize=12)
 
-    # 显示图形并保存
+    # Display and save the figure
     plt.tight_layout()
 
     save_path = os.path.join(save_folder, "Similarity_Plot.png")
-    plt.savefig(save_path, bbox_inches='tight', dpi=300)  # 保存图像文件为高清
+    plt.savefig(save_path, bbox_inches='tight', dpi=300)  # Save as high-resolution image
     print(f"Visualization saved to {save_path}")
 
-    # 显示图形并关闭
+    # Show and close the figure
     plt.show()
     plt.close()
 
 
 def save_value_function_to_txt(value_function, save_folder,iteration):
     """
-    将 value_function 保存为一个 .txt 文件，每行保存 12 个值
-    :param value_function: 要保存的值 (PyTorch 张量或 NumPy 数组)
-    :param save_folder: 保存文件的文件夹路径
+    Save value_function to a .txt file with 12 values per line.
+    :param value_function: Values to save (PyTorch tensor or NumPy array)
+    :param save_folder: Folder path to save the file
     """
-    # 如果 value_function 是 PyTorch 张量，先转换为 NumPy 数组
+    # Convert to NumPy array if value_function is a PyTorch tensor
     if isinstance(value_function, torch.Tensor):
         value_function = value_function.cpu().numpy()
 
-    # 构建保存路径
+    # Build save path
     save_path = os.path.join(save_folder, f'value_function_scores_{iteration}.txt')
 
-    # 将数值按行（每行 12 个）写入 .txt 文件
+    # Write values to .txt file (12 per line)
     with open(save_path, 'w') as f:
         for i in range(0, len(value_function), 12):
             line_values = value_function[i:i + 12]
-            line_str = " ".join(map(str, line_values))  # 用空格分隔每个值
-            f.write(f"{line_str}\n")  # 每行写 12 个值
+            line_str = " ".join(map(str, line_values))  # Space-separated values
+            f.write(f"{line_str}\n")  # Write 12 values per line
     
     print(f"value_function saved to {save_path}")
 
 
 def save_amx_similarities(folder_path, loooop_max_similarities):
     """
-    保存每一轮迭代的图片、相似度和方差
-    :param folder_path: 保存的根文件夹
-    :param iteration: 当前迭代轮次
-    :param image_paths: 图片路径列表
-    :param similarities: 相似度列表
-    :param variance: 相似度的方差
+    Save images, similarities, and variance for each iteration.
+    :param folder_path: Root folder for saving
+    :param iteration: Current iteration round
+    :param image_paths: List of image paths
+    :param similarities: List of similarities
+    :param variance: Variance of similarities
     """
     iter_folder = os.path.join(folder_path)
     os.makedirs(iter_folder, exist_ok=True)
     
-    # # 保存图片
+    # # Save images
     # for i, image_path in enumerate(image_paths):
     #     image = Image.open(image_path)
     #     image.save(os.path.join(iter_folder, f"selected_image_{i}.jpg"))
     
-    # 保存相似度和方差
+    # Save similarities and variance
     with open(os.path.join(iter_folder, "similarities.txt"), "w") as f:
         f.write(f"MAx similarity: {loooop_max_similarities}\n")
         # # f.write(f"Variance: {variance}\n")
@@ -224,22 +224,22 @@ def save_amx_similarities(folder_path, loooop_max_similarities):
 
 def save_results(folder_path, iteration, image_paths,  similarities, max_similarity):
     """
-    保存每一轮迭代的图片、相似度和方差
-    :param folder_path: 保存的根文件夹
-    :param iteration: 当前迭代轮次
-    :param image_paths: 图片路径列表
-    :param similarities: 相似度列表
-    :param variance: 相似度的方差
+    Save images, similarities, and variance for each iteration.
+    :param folder_path: Root folder for saving
+    :param iteration: Current iteration round
+    :param image_paths: List of image paths
+    :param similarities: List of similarities
+    :param variance: Variance of similarities
     """
     iter_folder = os.path.join(folder_path, f"iteration_{iteration}")
     os.makedirs(iter_folder, exist_ok=True)
     
-    # 保存图片
+    # Save images
     for i, image_path in enumerate(image_paths):
         image = Image.open(image_path)
         image.save(os.path.join(iter_folder, f"selected_image_{i}.jpg"))
     
-    # 保存相似度和方差
+    # Save similarities and variance
     with open(os.path.join(iter_folder, "similarities.txt"), "w") as f:
         f.write(f"similarities: {similarities}\n")
         f.write(f"MAx similarity: {max_similarity}\n")
@@ -248,13 +248,13 @@ def save_results(folder_path, iteration, image_paths,  similarities, max_similar
         
 def get_image_path(category_idx, image_idx, text_list):
     """
-    根据类别和图片索引返回图片路径，检查文件夹是否包含12张图片
-    :param category_idx: 类别索引
-    :param image_idx: 图片索引
-    :param text_list: 文件夹列表
-    :return: 图片的路径
+    Return image path based on category and image index, checking if folder contains 12 images.
+    :param category_idx: Category index
+    :param image_idx: Image index
+    :param text_list: List of folders
+    :return: Path to the image
     """
-    # 获取类别文件夹路径
+    # Get category folder path
 
     category_folder = text_list[category_idx]
     # print(category_idx)
@@ -264,43 +264,43 @@ def get_image_path(category_idx, image_idx, text_list):
     image_file = [f for f in sorted(os.listdir(folder_path)) if f.endswith(('.jpg', '.png')) and not f.startswith('._')]
     
     # print(image_file)
-        # # 检查文件夹中的图片数量是否为12
+        # # Check if the folder contains exactly 12 images
     # images_in_folder = sorted(os.listdir(folder_path))
     
     
     # if len(images_in_folder) != 12:
     #     raise ValueError(f"Error: The folder {folder_path} contains {len(images_in_folder)} images, but 12 are expected.")
     
-    # # 获取图片文件名，假设文件夹中的图片按某种顺序排列
+    # # Get image filenames, assuming images in the folder are sorted in some order
     image_file = image_file[image_idx]
     
-    # 返回图片的完整路径
+    # Return the full image path
     return os.path.join(folder_path, image_file)
 
 def load_thingstestimagedata(img_directory):
     images = []
-    category_images = []  # 用于存储每个类别的12张图片
+    category_images = []  # Stores 12 images per category
     all_folders = [d for d in os.listdir(img_directory) if os.path.isdir(os.path.join(img_directory, d))]
-    all_folders.sort()  # 保证文件夹的顺序
+    all_folders.sort()  # Ensure consistent folder ordering
     # print(all_folders)
     for folder in all_folders:
         # print(folder)
         folder_path = os.path.join(img_directory, folder)
         folder_images = [img for img in os.listdir(folder_path) if img.lower().endswith(('.png', '.jpg', '.jpeg'))]
-        folder_images.sort()  # 保证每类图片按顺序
+        folder_images.sort()  # Ensure images within each category are ordered
         # print(folder_images)
         
         
-        # 只保留前12张图片
+        # Keep only the first 12 images
         folder_images = folder_images[:12]
         full_image_paths = [os.path.join(folder_path, img) for img in folder_images]
         category_images.append(full_image_paths)
        
     # print(category_images)
-    return category_images  # 返回每个类别的图片路径列表
+    return category_images  # Return list of image paths per category
 
 def save_eeg(synthetic_eeg, gt_eeg_path, file_name):
-# 文件名带有排序特征
+# Filename includes sortable identifier
     gt_eeg_path = os.path.join(gt_eeg_path, file_name)
     np.save(gt_eeg_path, synthetic_eeg)
     return gt_eeg_path
@@ -317,29 +317,29 @@ def get_gteeg(image_gt_path, encoder_model_path,dnn, device):
 
 def plot_similarity_and_mse_with_dual_axis(similarities_per_iteration, save_folder, target_similarity=1.0):
     """
-    绘制相似度和根据相似度计算的MSE曲线，带误差带，使用双坐标轴，并调整外框线宽。
+    Plot similarity and MSE curves with error bands using dual y-axes, with adjusted border line width.
     
     Args:
-        similarities_per_iteration (list): 每轮迭代中的相似度列表，形状为 [iterations, num_images_per_iteration]
-        save_folder (str): 保存图片的文件夹路径
-        target_similarity (float, optional): 目标相似度，用于计算MSE，默认为1.0（表示完全相似）
+        similarities_per_iteration (list): List of similarities per iteration, shape [iterations, num_images_per_iteration]
+        save_folder (str): Folder path to save the plot
+        target_similarity (float, optional): Target similarity for MSE computation, default 1.0 (perfect similarity)
     """
-    # 数据预处理
+    # Data preprocessing
     num_iterations = len(similarities_per_iteration)
     iterations = range(1, num_iterations + 1)
     
-    # 计算统计量
+    # Compute statistics
     avg_similarities = [np.mean(s) for s in similarities_per_iteration]
     max_similarities = [np.max(s) for s in similarities_per_iteration]
     min_similarities = [np.min(s) for s in similarities_per_iteration]
     
-    # 计算MSE（基于max_similarities）
+    # Compute MSE (based on max_similarities)
     mse_per_iteration = [(sim - target_similarity)**2 for sim in max_similarities]
     
-    # 创建图形和坐标轴
+    # Create figure and axes
     fig, ax1 = plt.subplots(figsize=(10, 6))
     
-    # 绘制相似度曲线（左轴）
+    # Plot similarity curve (left axis)
     ax1.fill_between(iterations, min_similarities, max_similarities, 
                     color='lightblue', alpha=0.3, label='Similarity Range')
     ax1.plot(iterations, avg_similarities, color='blue', 
@@ -348,25 +348,25 @@ def plot_similarity_and_mse_with_dual_axis(similarities_per_iteration, save_fold
     ax1.set_ylabel('Similarity', fontsize=12)
     ax1.grid(True, linestyle='--', alpha=0.6)
     
-    # 创建右轴并绘制MSE曲线
+    # Create right axis and plot MSE curve
     ax2 = ax1.twinx()
     ax2.plot(iterations, mse_per_iteration, color='red', 
             linewidth=2, linestyle='--', label='MSE')
     ax2.set_ylabel('MSE', fontsize=12)
     
-    # 样式调整
+    # Style adjustments
     for ax in [ax1, ax2]:
         ax.spines['top'].set_visible(False)
         ax.tick_params(axis='both', which='major', labelsize=10)
     
-    # 合并图例
+    # Merge legends
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines1 + lines2, labels1 + labels2, 
               loc='upper center', fontsize=10, ncol=3,
               bbox_to_anchor=(0.5, 1.15))
     
-    # 保存和显示
+    # Save and display
     plt.tight_layout()
     save_path = os.path.join(save_folder, "Similarity_and_MSE_Dual_Axis.png")
     plt.savefig(save_path, bbox_inches='tight', dpi=300)
@@ -377,13 +377,13 @@ def plot_similarity_and_mse_with_dual_axis(similarities_per_iteration, save_fold
     
 def visualize_images(image_paths, save_folder, iteration):
     """
-    使用 matplotlib 按相似度顺序显示选中的图片
-    :param image_paths: 图片路径列表
-    :param similarities: 每张图片的相似度列表
+    Display selected images in order using matplotlib.
+    :param image_paths: List of image paths
+    :param similarities: Similarity value for each image
     """
 
 
-    # 绘制图像
+    # Plot images
     fig, axes = plt.subplots(1, len(image_paths), figsize=(15, 5))
     for i, image_path in enumerate(image_paths):
         image = Image.open(image_path)
@@ -392,53 +392,53 @@ def visualize_images(image_paths, save_folder, iteration):
                 
     plt.show()
     
-    os.makedirs(save_folder, exist_ok=True)  # 创建文件夹（如果不存在）
+    os.makedirs(save_folder, exist_ok=True)  # Create folder if it doesn't exist
     save_path = os.path.join(save_folder, f"visualization_iteration_{iteration}.png")
-    fig.savefig(save_path, bbox_inches='tight')  # 保存图像文件
+    fig.savefig(save_path, bbox_inches='tight')  # Save image file
     print(f"Visualization saved to {save_path}")
 
         
 def visualize_top_images(image_paths, similarities, save_folder, iteration):
     """
-    使用 matplotlib 按相似度顺序显示选中的图片
-    :param image_paths: 图片路径列表
-    :param similarities: 每张图片的相似度列表
+    Display selected images sorted by similarity in descending order using matplotlib.
+    :param image_paths: List of image paths
+    :param similarities: Similarity value for each image
     """
-    # 将图片路径和相似度结合，并按相似度降序排序
+    # Pair image paths with similarities and sort by similarity in descending order
     image_similarity_pairs = sorted(zip(image_paths, similarities), key=lambda x: x[1], reverse=True)
     
-    # 拆分排序后的图片路径和相似度
+    # Unzip sorted image paths and similarities
     sorted_image_paths, sorted_similarities = zip(*image_similarity_pairs)
 
-    # 绘制图像
+    # Plot images
     fig, axes = plt.subplots(1, len(sorted_image_paths), figsize=(15, 5))
     for i, image_path in enumerate(sorted_image_paths):
         image = Image.open(image_path)
         axes[i].imshow(image)
         axes[i].axis('off')
-        axes[i].set_title(f'Similarity: {sorted_similarities[i]:.4f}', fontsize=8)  # 显示相似度
+        axes[i].set_title(f'Similarity: {sorted_similarities[i]:.4f}', fontsize=8)  # Display similarity
     plt.show()
     
-    os.makedirs(save_folder, exist_ok=True)  # 创建文件夹（如果不存在）
+    os.makedirs(save_folder, exist_ok=True)  # Create folder if it doesn't exist
     save_path = os.path.join(save_folder, f"visualization_iteration_{iteration}.png")
-    fig.savefig(save_path, bbox_inches='tight')  # 保存图像文件
+    fig.savefig(save_path, bbox_inches='tight')  # Save image file
     print(f"Visualization saved to {save_path}")
 
 def extract_number(filename):
     """
-    从文件名中提取数字。如果没有数字，则返回0。
+    Extract numbers from a filename. Returns 0 if no numbers are found.
     
     """
     
     numbers = re.findall(r'(\d+)', filename)
     if numbers:
-        return tuple(map(int, numbers))  # 返回多个数字的元组
-    return (float('inf'),)  # 如果没有数字，返回一个包含非常大值的元组
+        return tuple(map(int, numbers))  # Return tuple of multiple numbers
+    return (float('inf'),)  # If no numbers found, return a tuple with a very large value
 
     # match = re.search(r'(\d+)', filename)
     # return int(match.group(1)) if match else 0
 
-# 遍历图像文件夹，处理每个图像
+# Iterate through image folder and process each image
 def generate_and_save_eeg_for_all_images(model_path, test_image_list, save_dir, device, category_list):
     model = load_model_endocer(model_path, device)
     for idx, image_path in enumerate(test_image_list):
@@ -447,12 +447,12 @@ def generate_and_save_eeg_for_all_images(model_path, test_image_list, save_dir, 
         category = category_list[idx]
         save_eeg_signal(synthetic_eeg, save_dir, idx, category)
 
-    # # 加载已经保存的模型
+    # # Load the previously saved model
     # # model_path = '/mnt/repo0/kyw/close-loop/sub_model/sub-08/generation/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-False/model_state_dict_250hz.pt'
     # model = load_model_endocer(model_path, device)
-    #  # EEG 信号保存路径
+    #  # EEG signal save path
 
-    # # 遍历图像文件夹中的每一张图像
+    # # Iterate through each image in the image folder
     # # image_files = sorted([f for f in os.listdir(image_folder) if f.endswith(('.jpg', '.png'))])
     # # image_files = natsorted([f for f in os.listdir(image_folder) if f.endswith(('.jpg', '.png')) and not f.startswith('._')])
     # # image_files = [f for f in os.listdir(image_folder) if f.endswith(('.jpg', '.png')) and not f.startswith('._')]
@@ -464,15 +464,15 @@ def generate_and_save_eeg_for_all_images(model_path, test_image_list, save_dir, 
 
     # for idx, image_file in enumerate(image_files):
     #     image_path = os.path.join(image_folder, image_file)
-    #     # print(f"正在处理图像: {image_path}")
+    #     # print(f"Processing image: {image_path}")
 
-    #     # 预处理图像
+    #     # Preprocess image
     #     image_tensor = preprocess_image(image_path, device)
 
-    #     # 生成 EEG 信号
+    #     # Generate EEG signal
     #     synthetic_eeg = generate_eeg(model, image_tensor, device)
 
-    #     # 保存 EEG 信号
+    #     # Save EEG signal
     #     save_eeg_signal(synthetic_eeg, save_dir, idx, image_gen)
         
 
@@ -481,9 +481,9 @@ class PositionalEncoding(nn.Module):
         super(PositionalEncoding, self).__init__()
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        # 计算额外的一个元素以适应奇数维度
+        # Compute one extra element to accommodate odd dimensions
         div_term = torch.exp(torch.arange(0, d_model + 1, 2).float() * (-math.log(10000.0) / d_model))
-        # 使用切片确保不会溢出
+        # Use slicing to prevent overflow
         pe[:, 0::2] = torch.sin(position * div_term[:d_model // 2 + 1])
         pe[:, 1::2] = torch.cos(position * div_term[:d_model // 2])
 
@@ -605,11 +605,11 @@ class ATM_S_reconstruction_scale_0_1000(nn.Module):
     
 def load_model_decoder(model_path, device):
     """
-    加载预训练的 EEG 和图像模型以及优化器的状态
+    Load pretrained EEG and image models along with optimizer state.
     """
     checkpoint = torch.load(model_path, map_location=device)
-    eeg_model = ATM_S_reconstruction_scale_0_1000(17, 250)  # 例如 ATM_S_reconstruction_scale_0_1000 是 EEG 模型
-    img_model = Proj_img()  # 假设使用的是 Proj_img 模型
+    eeg_model = ATM_S_reconstruction_scale_0_1000(17, 250)  # e.g. ATM_S_reconstruction_scale_0_1000 as the EEG model
+    img_model = Proj_img()  # Assuming Proj_img is the image model
 
     eeg_model.load_state_dict(checkpoint['eeg_model_state_dict'])
     img_model.load_state_dict(checkpoint['img_model_state_dict'])
@@ -618,7 +618,7 @@ def load_model_decoder(model_path, device):
     return eeg_model.to(device), img_model.to(device), optimizer_state
 
 def ImageEncoder(images, img_model, preprocess_train, device):
-    batch_size = 20  # 设置为合适的值
+    batch_size = 20  # Set to an appropriate value
     image_features_list = []
       
     for i in range(0, len(images), batch_size):
@@ -637,7 +637,7 @@ def ImageEncoder(images, img_model, preprocess_train, device):
 
 def load_all_eeg_signals(eeg_folder):
     """
-    从文件夹加载 EEG 信号
+    Load EEG signals from a folder.
     """
     eeg_paths = []
     for filename in os.listdir(eeg_folder):
@@ -646,17 +646,17 @@ def load_all_eeg_signals(eeg_folder):
     eeg_signals = []
 
     for path in eeg_paths:
-        # 检查文件是否存在
+        # Check if file exists
         if not os.path.isfile(path):
-            raise FileNotFoundError(f"文件未找到: {path}")
+            raise FileNotFoundError(f"File not found: {path}")
 
-        # 加载单个脑电信号
-        eeg_tensor = load_eeg_signals(path)  # 形状为 [17, 100]
+        # Load a single EEG signal
+        eeg_tensor = load_eeg_signals(path)  # Shape: [17, 100]
 
         eeg_signals.append(eeg_tensor)
 
-    # 堆叠所有脑电信号，形成形状为 [N, 17, 100] 的张量
-    combined_eeg = torch.stack(eeg_signals, dim=0)  # 形状为 [81, 17, 100]
+    # Stack all EEG signals into a tensor of shape [N, 17, 100]
+    combined_eeg = torch.stack(eeg_signals, dim=0)  # Shape: [81, 17, 100]
     
     return  combined_eeg
 
@@ -671,7 +671,7 @@ def get_eeg_features(eeg_model, eeg_signal, device):
     eeg_model.to(device)
     eeg_signal = eeg_signal.to(device)
     subject_ids = torch.full((1,), int('08'), dtype=torch.long).to(device)  
-    eeg_embeds = eeg_model(eeg_signal.unsqueeze(0), subject_ids).float()  # 将EEG信号传入模型
+    eeg_embeds = eeg_model(eeg_signal.unsqueeze(0), subject_ids).float()  # Pass EEG signal through the model
 
     return eeg_embeds
 
@@ -684,13 +684,13 @@ def get_img_features(img_model, preprocess_train,vlmodel,device,img_path):
     
 def evaluate_eeg_signals(eeg_model, img_model, eeg_signals_truth, device, truth_folder, false_folder, truth, false):
     """
-    对给定的EEG信号进行分类，并计算准确率
+    Classify given EEG signals and compute accuracy.
     """
     correct = 0
     total = 0
     correct_samples = []
 
-    # 加载 truth 和 false 文件夹中的图像并生成特征
+    # Load images from truth and false folders and generate features
     img_truth_paths = [os.path.join(truth_folder, f"{truth}_{i+1}.jpg") for i in range(len(eeg_signals_truth))]
     img_truth = ImageEncoder(img_truth_paths, img_model, preprocess_train, device)
 
@@ -698,25 +698,25 @@ def evaluate_eeg_signals(eeg_model, img_model, eeg_signals_truth, device, truth_
     img_false = ImageEncoder(img_false_paths, img_model, preprocess_train, device)
 
     with torch.no_grad():
-        # 遍历 truth 和 false 文件夹中的 EEG 信号
+        # Iterate through EEG signals in truth and false folders
         for idx, eeg_data in enumerate(eeg_signals_truth):
             eeg_data = eeg_data.to(device)
-            eeg_features = eeg_model(eeg_data.unsqueeze(0)).float()  # 将EEG信号传入模型
+            eeg_features = eeg_model(eeg_data.unsqueeze(0)).float()  # Pass EEG signal through the model
             logit_scale = eeg_model.logit_scale
 
-            # 提取 truth 图片特征
+            # Extract truth image features
             img_features_truth = img_truth[idx].unsqueeze(0).float()
-            img_features_false = img_false[idx % len(img_false)].unsqueeze(0).float()  # 循环使用 false 特征
+            img_features_false = img_false[idx % len(img_false)].unsqueeze(0).float()  # Cycle through false features
 
-            # 计算与 truth 和 false 图片的 logits
+            # Compute logits against truth and false images
             logits_truth = logit_scale * (eeg_features @ img_features_truth.T)
             logits_false = logit_scale * (eeg_features @ img_features_false.T)
 
-            # 将 truth 和 false 的 logits 合并，判断是否正确分类
+            # Concatenate truth and false logits to determine classification
             logits = torch.cat([logits_truth, logits_false], dim=1)
             predicted_label = torch.argmax(logits)
 
-            true_label = 0  # truth 的标签为 0
+            true_label = 0  # Label for truth is 0
 
             if predicted_label == true_label:
                 correct += 1
@@ -724,29 +724,29 @@ def evaluate_eeg_signals(eeg_model, img_model, eeg_signals_truth, device, truth_
 
             total += 1
 
-        # 遍历 false 文件夹中的 EEG 信号
+        # Iterate through EEG signals in false folder
         # for idx, eeg_data in enumerate(eeg_signals_false):
         #     eeg_data = eeg_data.to(device)
-        #     eeg_features = eeg_model(eeg_data.unsqueeze(0)).float()  # 将EEG信号传入模型
+        #     eeg_features = eeg_model(eeg_data.unsqueeze(0)).float()  # Pass EEG signal through the model
         #     logit_scale = eeg_model.logit_scale
 
-        #     # 提取 truth 和 false 图片特征
-        #     img_features_truth = img_truth[idx % len(img_truth)].unsqueeze(0).float()  # 循环使用 truth 特征
+        #     # Extract truth and false image features
+        #     img_features_truth = img_truth[idx % len(img_truth)].unsqueeze(0).float()  # Cycle through truth features
         #     img_features_false = img_false[idx].unsqueeze(0).float()
 
-        #     # 计算与 truth 和 false 图片的 logits
+        #     # Compute logits against truth and false images
         #     logits_truth = logit_scale * (eeg_features @ img_features_truth.T)
         #     logits_false = logit_scale * (eeg_features @ img_features_false.T)
 
-        #     # 将 truth 和 false 的 logits 合并，判断是否正确分类
+        #     # Concatenate truth and false logits to determine classification
         #     logits = torch.cat([logits_truth, logits_false], dim=1)
         #     predicted_label = torch.argmax(logits)
 
-        #     true_label = 1  # false 的标签为 1
+        #     true_label = 1  # Label for false is 1
 
         #     if predicted_label == true_label:
         #         correct += 1
-        #         correct_samples.append(idx + len(eeg_signals_truth))  # 索引需要加上 truth 的数量
+        #         correct_samples.append(idx + len(eeg_signals_truth))  # Offset index by the number of truth samples
 
         #     total += 1
 

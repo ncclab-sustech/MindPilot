@@ -124,7 +124,7 @@ def load_eeg_data(args, idx_val):
 	data = np.load(os.path.join('/mnt/dataset0/ldy/4090_Workspace/4090_THINGS', data_dir, test_file),
 		allow_pickle=True)
 	y_test = data['preprocessed_eeg_data'][:, :, selected_indices, :]
-	print(f"test的EEG通道数据形状: {y_test.shape}")
+	print(f"Test EEG channel data shape: {y_test.shape}")
 	# Average across repetitions
 	y_test = np.mean(y_test, 1)
 	# Convert to float32 and tensor (for DNN training with Pytorch)

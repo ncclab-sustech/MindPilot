@@ -204,46 +204,46 @@ class RingBuffer(BaseBuffer):
 
 def resolveMeta(raw: bytes) -> dict:
     """
-    具体的解析meta包的过程
-    :param raw:meta包的原始数据，一堆byte
+    Parse the meta packet.
+    :param raw: Raw bytes of the meta packet
     :return:
     """
-    # 解析HeadLength
+    # Parse HeadLength
     headerLength = int.from_bytes(raw[2:6], byteorder="little", signed=False)
     head = raw[:headerLength]
-    # 解析HeadToken,HeaderLength,TotalLength,Flag,ModuleCount(这些合起来总长为HeaderLength)
-    # <代表以little-endian方式解析
-    # H代表1个unsigned short(2个Byte)
-    # 4I代表4个unsigned int(4个Byte)
-    # 具体见 https://docs.python.org/3/library/struct.html
+    # Parse HeadToken, HeaderLength, TotalLength, Flag, ModuleCount (total length equals HeaderLength)
+    # < means little-endian byte order
+    # H means 1 unsigned short (2 bytes)
+    # 4I means 4 unsigned ints (4 bytes each)
+    # See https://docs.python.org/3/library/struct.html
     print(len(head))
 
     _, headerLength, totalLength, flag, moduleCount = unpack("<H4I", head)
     # _, headerLength, totalLength, flag, moduleCount = unpack("<4I", head)
-    # 解析剩余部分
+    # Parse the remaining part
     body = raw[headerLength:]
-    # 探头数量
+    # Number of modules (probes)
     D = moduleCount
-    # 每个设备数据包的起点偏移量,unpack返回的是tuple
+    # Starting offset for each module's data packet; unpack returns a tuple
     moduleOffsets = unpack(f"<{D}I", body[: 4 * D])
-    # 每个探头的byte数据
+    # Raw byte data for each module
     eachModuleData = []
     for m in range(D):
         offset = moduleOffsets[m]
         if m < D - 1:
-            # 前D-1个探头的数据范围是这个探头的起点偏移量到下一个探头的起点偏移量
+            # For the first D-1 modules, data range is from this module's offset to the next module's offset
             end = moduleOffsets[m + 1]
         else:
-            # 最后一个探头的数据范围是起点偏移量到整个meta包的末尾去除TailToken
+            # For the last module, data range is from its offset to the end of the meta packet minus TailToken
             end = totalLength - 2
         eachModuleData.append(raw[offset:end])
-    # 解析每个探头的meta数据，key是SN号，value是具体的meta数据
+    # Parse meta data for each module; key is serial number, value is the parsed meta data
     modules = {}
     for m in range(D):
         module = resolveMetaEachModule(eachModuleData[m])
         key = module['serialNumber']
         modules[key] = module
-    # 返回的结果
+    # Result
     result = {
         "flag": flag,
         "moduleCount": moduleCount,
@@ -254,37 +254,37 @@ def resolveMeta(raw: bytes) -> dict:
 
 def resolveMetaEachModule(fragment: bytes) -> dict:
     """
-    解析meta包中每个探头的信息
-    :param fragment:每个探头的原始数据，一堆byte
+    Parse information for each module in the meta packet.
+    :param fragment: Raw bytes of each module's data
     :return:
     """
-    # 解析PersonName,ModuleName,ModuleType,SerialNumber,ChannelCount
+    # Parse PersonName, ModuleName, ModuleType, SerialNumber, ChannelCount
     personName, moduleName, moduleType, serialNumber, channelCount = unpack("<30s30s30s2I", fragment[:98])
-    # 去除首尾空格
+    # Strip trailing null characters
     personName = personName.decode("utf8").strip("\x00")
     moduleName = moduleName.decode("utf8").strip("\x00")
     moduleType = moduleType.decode("utf8").strip("\x00")
-    # 通道名称
+    # Channel names
     channelNames = list(unpack("10s" * channelCount, fragment[98: 98 + 10 * channelCount]))
     channelNames = [b.decode("utf8").strip("\x00") for b in channelNames]
-    # 通道类型
+    # Channel types
     channelTypes = list(unpack("10s" * channelCount, fragment[98 + 10 * channelCount: 98 + 20 * channelCount]))
     channelTypes = [b.decode("utf8").strip("\x00") for b in channelTypes]
-    # 采样率
+    # Sample rates
     sampleRates = list(unpack(f"<{channelCount}I", fragment[98 + 20 * channelCount: 98 + 24 * channelCount]))
-    # 各个通道的数据量
+    # Data count per channel
     dataCountPerChannel = list(unpack(f"<{channelCount}I", fragment[98 + 24 * channelCount: 98 + 28 * channelCount]))
-    # 各个通道的最大数字值
+    # Max digital value per channel
     maxDigital = list(unpack(f"<{channelCount}i", fragment[98 + 28 * channelCount: 98 + 32 * channelCount]))
-    # 各个通道的最小数字值
+    # Min digital value per channel
     minDigital = list(unpack(f"<{channelCount}i", fragment[98 + 32 * channelCount: 98 + 36 * channelCount]))
-    # 各个通道的最大模拟值
+    # Max physical (analog) value per channel
     maxPhysical = list(unpack(f"<{channelCount}f", fragment[98 + 36 * channelCount: 98 + 40 * channelCount]))
-    # 各个通道的最小模拟值
+    # Min physical (analog) value per channel
     minPhysical = list(unpack(f"<{channelCount}f", fragment[98 + 40 * channelCount: 98 + 44 * channelCount]))
-    # 各个通道的增益
+    # Gain per channel
     gain = list(unpack(f"{channelCount}c", fragment[98 + 44 * channelCount: 98 + 45 * channelCount]))
-    # 返回的结果
+    # Result
     result = {"personName": personName,
               "moduleName": moduleName,
               "moduleType": moduleType,
@@ -304,56 +304,56 @@ def resolveMetaEachModule(fragment: bytes) -> dict:
 
 def isChannelNotAllEEG(channelTypes: list) -> bool:
     """
-    判断是否所有通道都是非EEG类型
-    :param channelTypes:所有通道的类型
+    Check if all channels are non-EEG types.
+    :param channelTypes: List of all channel types
     :return:
     """
     for channelType in channelTypes:
-        # 有一个通道是EEG就返回False
+        # If any channel is EEG, return False
         if channelType == 'EEG':
             return False
-    # 所有通道都不是EEG就返回True
+    # All channels are non-EEG, return True
     return True
 
 
 def resolveData(raw: bytes, meta: dict) -> dict:
     """
-    解析数据包的具体过程
-    :param raw:数据包原始数据，一堆byte
-    :param meta:解析好的meta包
+    Parse a data packet.
+    :param raw: Raw bytes of the data packet
+    :param meta: Previously parsed meta packet
     :return:
     """
-    # 包的总长度，固定为30
+    # Header length, fixed at 30
     headerLength = int.from_bytes(raw[2:6], byteorder="little", signed=False)
-    # 解析HeadToken,HeaderLength,TotalLength,StartTimestamp,TimeStampLength,TriggerCount,Flag,ModuleCount
+    # Parse HeadToken, HeaderLength, TotalLength, StartTimestamp, TimeStampLength, TriggerCount, Flag, ModuleCount
     head = raw[:headerLength]
-    # HeadToken为unsigned short，其余为unsigned int
+    # HeadToken is unsigned short, the rest are unsigned ints
     _, headerLength, totalLength, startTimeStamp, timeStampLength, triggerCount, flag, moduleCount = unpack("<H7I", head)
-    # 解析剩余部分
+    # Parse the remaining part
     body = raw[headerLength:]
-    # 协议中有使用D和T，保持一致
+    # D and T follow the naming convention used in the protocol
     D = moduleCount
     T = triggerCount
-    # 每个探头的在数据包中的偏移量，moduleOffsets是个tuple
+    # Offset of each module in the data packet; moduleOffsets is a tuple
     moduleOffsets = unpack(f"<{D}I", body[: 4 * D])
-    # 前面D-1个探头的数据范围是这个探头的偏移起点到下一个探头的偏移起点
-    # 最后一个探头的数据范围是偏移起点到数据末尾去除TriggerTimestamps,Triggers,TailToken三项
+    # For the first D-1 modules, data range is from this module's offset to the next module's offset
+    # For the last module, data range is from its offset to the end minus TriggerTimestamps, Triggers, and TailToken
     eachModuleData = []
     for m in range(D):
         offset = moduleOffsets[m]
         if m < D - 1:
             end = moduleOffsets[m + 1]
         else:
-            # TriggerTimestamps,Triggers,TailToken三项分别长4*T,30*T,2
+            # TriggerTimestamps, Triggers, TailToken are 4*T, 30*T, and 2 bytes respectively
             end = totalLength - 2 - 34 * T
         eachModuleData.append(raw[offset:end])
-    # 每个探头的数据，包括sn号、Bitmask和Datas
+    # Data for each module, including serial number, Bitmask, and Datas
     modules = {}
     for m in range(D):
         module = resolveDataEachModule(eachModuleData[m], meta)
         key = module['serialNumber']
         modules[key] = module
-    # 返回的结果
+    # Result
     result = {
         "flag": flag,
         "startTimeStamp": startTimeStamp,
@@ -366,28 +366,28 @@ def resolveData(raw: bytes, meta: dict) -> dict:
 
 def resolveDataEachModule(fragment: bytes, meta: dict) -> dict:
     """
-    整体转发解析每个探头数据的过程
-    :param fragment:这个探头的原始数据，一堆byte
-    :param meta:解析好的meta数据
+    Parse each module's data in bulk forwarding mode.
+    :param fragment: Raw bytes of this module's data
+    :param meta: Previously parsed meta data
     :return:
     """
-    # 这个探头的SN号
+    # Serial number of this module
     serialNumber = int.from_bytes(fragment[:4], byteorder="little", signed=False)
-    # 通道数量
+    # Number of channels
     N = meta["modules"][serialNumber]["channelCount"]
-    # 每个通道的数据点数
+    # Number of data points per channel
     dataCountPerChannel = meta["modules"][serialNumber]["dataCountPerChannel"]
-    # 每个通道是否有值
+    # Whether each channel has data
     bitmask = list(unpack(f"{N}?", fragment[4:4 + N]))
-    # data是个list，shape为:通道数*每个通道点数
+    # data is a list with shape: num_channels * points_per_channel
     data = []
     raw = list(unpack(f"<{sum(dataCountPerChannel)}f", fragment[4 + N:]))
-    # 把一段很长的连续的原始数据raw，根据每个通道的点数切成通道数*每个通道点数
+    # Split the long continuous raw data into num_channels * points_per_channel based on each channel's point count
     cursor = 0
     for count in dataCountPerChannel:
         data.append(raw[cursor: cursor + count])
         cursor += count
-    # 返回的结果
+    # Result
     result = {
         "serialNumber": serialNumber,
         "bitmask": bitmask,
@@ -408,138 +408,138 @@ class ConnectState(Enum):
     READY = 2
     # receiving data at present
     RUNNING = 3
-    # 中止连接
+    # Abort connection
     ABORT = 4
 
 
 class DataServerThread:
     """
-    用户就只需调用这个类
+    Users only need to call this class.
     """
 
     def __init__(self, sample_rate: int = 1000, t_buffer: float = 60):
         """
-        初始化
-        :param sample_rate:采样率
-        :param t_buffer:buffer的长度(秒)
+        Initialize.
+        :param sample_rate: Sampling rate
+        :param t_buffer: Buffer length (seconds)
         """
-        # 采样率
+        # Sampling rate
         self.sample_rate = sample_rate
-        # buffer长度(秒)
+        # Buffer length (seconds)
         self.t_buffer = t_buffer
-        # 初始化为不连接
+        # Initialize as not connected
         self.state = ConnectState.NOTCONNECT
-        # 在正式接收数据前有一个过渡期让数据稳定
+        # Transition period to stabilize data before formally receiving
         self.stabilizeCount = 0
         self.pointsForStabilize = 50
-        # 开始和结束的时间戳
+        # Start and end timestamps
         self.firstTimestamp = -1
         self.lastTimestamp = -1
-        # 是否已经接收到meta包
+        # Whether the meta packet has been received
         self.__hasMeta = False
-        # socket连接使用的buffer的锁
+        # Lock for the socket connection buffer
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socketBuffer = bytes()
         self.sockBufLock = Lock()
-        # 缓存单探头转发数据包
+        # Cache for per-module forwarded data packets
         self.single_module_data_buffer = []
-        # 缓存单探头转发trigger包
+        # Cache for per-module forwarded trigger packets
         self.single_module_trigger_buffer = []
-        # 缓存单探头转发数据包上限
+        # Max cached per-module forwarded data packets
         self.max_single_packet = 20
-        # 总共收到的包总数
+        # Total number of received packets
         self.packet_count = 0
-        # 收到的包的时间戳,data和trigger分开
+        # Timestamps of received packets, separated by data and trigger
         self.timeStamp = {'data': [], 'trigger': []}
-        # # 用于实时输出单探头转发下trigger，和jellyfish对比
+        # # For real-time output of triggers in per-module forwarding, for comparison with JellyFish
         # self.trigger_count = 0
 
     def connect(self, hostname: str = '127.0.0.1', port: int = 8712):
         """
-        和JellyFish进行连接
-        :param hostname:JellyFish软件运行的电脑的ip，如果在本机运行，就固定为127.0.0.1
-        :param port:JellyFish开放的端口号，默认为8712
+        Connect to JellyFish.
+        :param hostname: IP of the computer running JellyFish; use 127.0.0.1 if running locally
+        :param port: Port opened by JellyFish, default is 8712
         :return:
         """
         self.hostname = hostname
         self.port = port
-        # 重连次数
+        # Reconnection count
         reconnect_time = 10
-        # 一直尝试连接下去，直到连接成功
+        # Keep trying to connect until successful
         while self.state == ConnectState.NOTCONNECT:
             try:
                 self.sock.connect((self.hostname, self.port))
-                # 设置为非阻塞式接收
+                # Set to non-blocking mode
                 self.sock.setblocking(False)
-                # 设置状态为已连接
+                # Set state to connected
                 self.state = ConnectState.CONNECTED
-                # 启动读取数据的线程
+                # Start the data reading thread
                 self.openStream()
                 print('connect success')
             except:
-                # 连接失败时输出失败次数
+                # Output retry count on connection failure
                 reconnect_time += 1
                 print(f'connection failed, retrying for {reconnect_time} times')
                 time.sleep(1)
-                # 超过最大重连次数就放弃重连
+                # Give up reconnecting if max retries exceeded
                 if reconnect_time >= 1:
                     break
-        # 返回是否连接成功
+        # Return whether connection succeeded
         return self.state == ConnectState.NOTCONNECT
 
     def isReady(self):
         """
-        判断是否已经准备好读取数据(meta包有没有解析成功)
+        Check whether data reading is ready (i.e., whether the meta packet has been parsed successfully).
         :return:
         """
         return self.state == ConnectState.READY
 
     def start(self):
         """
-        开始接收转发的数据
+        Start receiving forwarded data.
         :return:
         """
-        # 还没解析好meta包就不允许开始接收数据
+        # Cannot start receiving data before meta packet is resolved
         if self.state == ConnectState.NOTCONNECT or self.state == ConnectState.CONNECTED:
             raise RuntimeError("Cannot start data recording before ready.")
-        # meta包已经解析好了就能就开始了
+        # Start once the meta packet has been resolved
         elif self.state == ConnectState.READY:
             self.state = ConnectState.RUNNING
 
     def stop(self):
         """
-        停止接收数据
+        Stop receiving data.
         :return:
         """
         self.state = ConnectState.ABORT
 
     def openStream(self):
         """
-        启动读取数据的线程
+        Start the data reading threads.
         :return:
         """
-        # 收数据和解析必须放在不同线程中，不然5ms单探头转发会丢包
+        # Receiving and parsing must be in separate threads; otherwise 5ms per-module forwarding may lose packets
         Thread(target=self.readDataThread, daemon=True).start()
         Thread(target=self.resolveDataThread, daemon=True).start()
 
     def readDataThread(self):
         """
-        在另一个线程中执行的接收数据函数
+        Data receiving function executed in a separate thread.
         :return:
         """
-        # 还没连接就不能接收数据
+        # Cannot receive data before connection is established
         if self.state == ConnectState.NOTCONNECT:
             raise RuntimeError("Cannot start receiving data before connect.")
-        # 一直不停接收数据直到停止接收
+        # Keep receiving data until stopped
         while self.state != ConnectState.ABORT:
-            # 具体的接收数据的函数
+            # Actual data receiving function
             self.receiveData()
-            # 不能sleep，sleep 1ms对于探头转发的5ms有严重影响
+            # Cannot sleep; 1ms sleep severely impacts 5ms per-module forwarding
             # time.sleep(0.001)
 
     def resolveDataThread(self):
         """
-        解析数据的线程
+        Data parsing thread.
         :return:
         """
         while True:
@@ -548,21 +548,20 @@ class DataServerThread:
 
     def receiveData(self):
         """
-        具体的接收数据的函数
+        Actual data receiving function.
         :return:
         """
         buffer = bytes()
         retry = True
         while retry:
-            # 设置了non-block模式后, recv如果无法接受到数据, 就会报异常
+            # In non-blocking mode, recv raises an exception when no data is available
             try:
-                # 询问了匡是,socket的read缓冲区大小不定
-                # 数据包的大小其实是不确定的 接了一大堆探头的话数据包就会很大
-                # 所以才有4096*10这种 尽可能比数据包更大
-                # 因为packet的大小不确定 所以可能会发生:"不完整包" 或者 "粘包" 的现象
-                # 要么收少了,发现收到的包不完整
-                # 要么收多了,发现一下子收了若干个包
-                # 4096*10 这个逻辑 就是确保只发生"粘包",后面的resolve针对粘包进行处理就行
+                # The socket read buffer size is variable.
+                # Packet size is actually indeterminate; connecting many probes leads to large packets.
+                # Hence 4096*10 to ensure the buffer is larger than any single packet.
+                # Because packet size is uncertain, "incomplete packet" or "sticky packet" issues may occur:
+                # either too little data (incomplete packet) or too much (multiple packets concatenated).
+                # The 4096*10 logic ensures only "sticky packets" occur; resolve() handles splitting them.
                 for i in range(10):
                     buffer += self.sock.recv(4096)
                     # if len(self.socketBuffer) > 0:
@@ -573,37 +572,37 @@ class DataServerThread:
                 else:
                     retry = True
                     # time.sleep(0.001)
-        # 解析数据时要使用self.socketBuffer，所以要加锁
+        # Lock needed since resolve uses self.socketBuffer
         self.sockBufLock.acquire()
         self.socketBuffer += buffer
         self.sockBufLock.release()
-        # # 具体的解析数据的过程
+        # # Actual data parsing process
         # self.resolve()
 
     def isSingleModule(self):
         """
-        判断是不是单探头
+        Check whether this is a single-module setup.
         :return:
         """
-        # 整体转发时只有1个探头
+        # Bulk forwarding has only 1 module
         if self.meta['moduleCount'] == 1:
             return True
         else:
-            # 单探头转发应该是2个探头，其中一个sn号为0
+            # Per-module forwarding should have 2 modules, one with SN=0
             if len(self.meta['modules'].keys()) == 2 and 0 in self.meta['modules'].keys():
                 return True
             else:
-                # 不满足以上两个条件就不是单人单探头
+                # Does not meet the above conditions; not a single-person single-module setup
                 return False
 
     def mergeMetaTriggerModule(self):
         """
-        单探头转发时把trigger探头的信息合并到高速探头中
+        In per-module forwarding, merge the trigger module's info into the high-speed module.
         :return:
         """
-        # 通道数+1
+        # Channel count +1
         self.n_chan += 1
-        # 其他附加上trigger探头的信息
+        # Append trigger module info
         self.srates.extend(self.meta['modules'][0]['sampleRates'])
         self.channelNames.extend(self.meta['modules'][0]['channelNames'])
         self.channelTypes.extend(self.meta['modules'][0]['channelTypes'])
@@ -616,64 +615,64 @@ class DataServerThread:
 
     def resolve(self):
         """
-        具体的解析数据的过程，协议见<数据转发协议-新版.xlsx>
+        Actual data parsing process. Protocol defined in <Data Forwarding Protocol - New Version.xlsx>.
         :return:
         """
-        # 要用到socketBuffer，先加锁
+        # Acquire lock since socketBuffer will be used
         self.sockBufLock.acquire()
-        # 判断接收到的包是meta包还是数据包
-        # 包的HeadToken，0x5FF5是meta包，0x5AA5是数据包，
+        # Determine whether the received packet is meta or data
+        # HeadToken: 0x5FF5 for meta packets, 0x5AA5 for data packets
         metaHeadToken = bytes.fromhex('5FF5')
         dataHeadToken = bytes.fromhex('5AA5')
         headToken = self.socketBuffer[0:2]
         if headToken == metaHeadToken:
-            # 是meta包
+            # Meta packet
             isMeta = True
         elif headToken == dataHeadToken:
-            # 是数据包
+            # Data packet
             isMeta = False
         else:
-            # 非法包直接报错
+            # Invalid packet, raise error
             raise ValueError(f"Invalid head token \"{headToken.hex()}\"")
-        # 根据TotalLength得到这个包的全长
+        # Get full packet length from TotalLength
         totalLength = int.from_bytes(self.socketBuffer[6:10], byteorder="little", signed=False)
         msg = self.socketBuffer[:totalLength]
-        # 检查TailToken,0xF55F是meta包，0xA55A是数据包，
+        # Check TailToken: 0xF55F for meta packets, 0xA55A for data packets
         metaTailToken = bytes.fromhex('F55F')
         dataTailToken = bytes.fromhex('A55A')
         tailToken = msg[-2:]
-        # meta包的HeadToken和TailToken都要符合
+        # Both HeadToken and TailToken must match for meta packets
         if isMeta and tailToken != metaTailToken:
             raise ValueError(f"Invalid tail token \"{tailToken.hex()}\"")
-        # 数据包的HeadToken和TailToken都要符合
+        # Both HeadToken and TailToken must match for data packets
         elif not isMeta and tailToken != dataTailToken:
             raise ValueError(f"Invalid tail token \"{tailToken.hex()}\"")
-        # 清空当前的socketBuffer
+        # Clear the current socketBuffer
         self.socketBuffer = self.socketBuffer[totalLength:]
-        # 这个包的长度和TotalLength对不上
+        # Packet length does not match TotalLength
         if totalLength != len(msg):
             raise ValueError('The message is not as long as it assigned!')
         self.sockBufLock.release()
-        # 解析meta包
+        # Parse meta packet
         if isMeta:
             if self.__hasMeta:
-                # JellyFish收到这边发送的meta接收OK包之前可能还在发meta包
-                # 已经解析过meta包就不要再解析了
+                # JellyFish may still be sending meta packets before receiving our OK confirmation
+                # Skip if meta packet has already been parsed
                 pass
             else:
-                # 解析meta包
+                # Parse meta packet
                 self.meta = resolveMeta(msg)
-                # 不是单探头就报错
+                # Raise error if not a single module
                 if not self.isSingleModule():
-                    raise Exception('只能是单人单探头!')
-                # 获取解析好的数据
-                # 找到非0的SN号，能运行到这肯定存在非0的sn号
+                    raise Exception('Only single-person single-module is supported!')
+                # Get the parsed data
+                # Find the non-zero SN; if we reach here, a non-zero SN must exist
                 for sn in self.meta['modules'].keys():
                     if sn != 0:
                         self.serialNumber = sn
-                # 整体转发直接取信息即可
+                # For bulk forwarding, retrieve info directly
                 self.n_chan = self.meta['modules'][self.serialNumber]['channelCount']
-                # 防止单探头转发合并时把self.meta包给修改了，导致后面解析数据包出问题
+                # Copy to prevent per-module merge from modifying self.meta, which would break data parsing
                 self.srates = self.meta['modules'][self.serialNumber]['sampleRates'].copy()
                 self.channelNames = self.meta['modules'][self.serialNumber]['channelNames'].copy()
                 self.channelTypes = self.meta['modules'][self.serialNumber]['channelTypes'].copy()
@@ -687,93 +686,94 @@ class DataServerThread:
                 self.moduleName = self.meta['modules'][self.serialNumber]['moduleName']
                 self.moduleType = self.meta['modules'][self.serialNumber]['moduleType']
                 if len(self.meta['modules'].keys()) == 2:
-                    # 单探头转发把trigger的信息合并到高速探头中
+                    # Per-module forwarding: merge trigger info into the high-speed module
                     self.mergeMetaTriggerModule()
-                # 如果所有通道都是非EEG类型，报错退出
+                # Raise error if all channels are non-EEG types
                 if isChannelNotAllEEG(self.channelTypes):
-                    raise Exception('所有通道都是非EEG类型!')
-                # buffer长度
+                    raise Exception('All channels are non-EEG types!')
+                # Buffer length
                 nPoints = int(np.round(self.t_buffer * self.sample_rate))
-                # 通道个数
+                # Number of channels
                 nChans = len(self.channelNames)
-                # 初始化RingBuffer
+                # Initialize RingBuffer
                 self.buffer = RingBuffer(nChans, nPoints)
-                # DoubleBuffer可以存储数据，测试数据正确性
+                # DoubleBuffer stores data for correctness verification
                 self.save_buffer = DoubleBuffer(nChans, nPoints)
-                # 发送 MetaData接收OK 确认包
+                # Send metadata received OK confirmation packet
                 succ = bytes.fromhex('F55F5FF5')
                 self.sock.send(succ)
                 self.__hasMeta = True
-        # 解析数据包
+        # Parse data packet
         else:
             if not self.__hasMeta:
-                # meta包还没解析好就报错
+                # Raise error if meta packet has not been resolved yet
                 raise RuntimeError("Wrong program. Receive data before meta.")
-            # 数据已经稳定了就认为准备好解析数据包了
+            # Consider data ready for parsing once stabilized
             if self.state == ConnectState.CONNECTED and self.stabilizeCount >= self.pointsForStabilize:
                 self.state = ConnectState.READY
-                # 数据稳定后就不需要这个变量了,复位
+                # No longer needed after stabilization, reset
                 self.stabilizeCount = 0
-            # 数据还没稳定
+            # Data not yet stable
             elif self.state == ConnectState.CONNECTED:
                 self.stabilizeCount += 1
                 return
-            # 数据包的解析结果
+            # Data packet parse result
             dataStruct = resolveData(msg, self.meta)
             self.packet_count += 1
-            # 整体转发
+            # Bulk forwarding
             if self.meta['flag'] % 2 == 0:
                 self.isDataPacketLost(dataStruct)
                 dataArr = dataStruct['modules'][self.serialNumber]['data']
                 tempBuf = []
                 for ch in range(self.n_chan):
                     tempBuf.append(dataArr[ch])
-                # 重采样trigger通道
+                # Resample trigger channel
                 tempBuf = self.ResampleTrigger(tempBuf)
                 tempBuf = np.array(tempBuf)
                 if self.state == ConnectState.RUNNING:
-                    # 把数据添加到RingBuffer
+                    # Append data to RingBuffer
                     self.buffer.appendBuffer(tempBuf)
-                    # 也添加一份到DoubleBuffer，用于测试
+                    # Also append to DoubleBuffer for verification
                     self.save_buffer.appendBuffer(tempBuf)
-                    # 时间戳
+                    # Timestamp
                     self.timeStamp['data'].append(dataStruct['startTimeStamp'])
-            # 按探头转发要组包
+            # Per-module forwarding requires packet assembly
             else:
                 sn = list(dataStruct['modules'].keys())[0]
-                # trigger通道的sn号为0
+                # Trigger channel has SN=0
                 if sn == 0:
-                    # 累计trigger的时间戳
+                    # Accumulate trigger timestamps
                     self.timeStamp['trigger'].append(dataStruct['startTimeStamp'])
-                    # 缓存trigger包
+                    # Cache trigger packet
                     self.single_module_trigger_buffer.append(dataStruct)
-                    # 输出收到的trigger包的信息
+                    # Output received trigger packet info
                     # self.trigger_count += 1
                     # print('trigger count:', self.trigger_count, 'trigger value:', dataStruct['modules'][0]['data'][0], 'time stamp:',
                     #       dataStruct['startTimeStamp'])
                 else:
                     self.isDataPacketLost(dataStruct)
-                    # 累计数据包的时间戳
+                    # Accumulate data packet timestamps
                     self.timeStamp['data'].append(dataStruct['startTimeStamp'])
-                    # 缓存数据包
+                    # Cache data packet
                     self.single_module_data_buffer.append(dataStruct)
-                # 缓存满了就进行组包操作
+                # Assemble packets when cache is full
                 if len(self.single_module_data_buffer) == self.max_single_packet:
                     self.combineDataAndTrigger()
 
     def ResampleTrigger(self, temBuf):
         """
-        整体转发时非1000采样率时trigger通道和其他通道在一个包内的点数不同，需要重采样
-        :param temBuf:一个包内各个通道的数据
+        In bulk forwarding, when sample rate is not 1000 Hz, the trigger channel and other channels
+        have different point counts within one packet and need resampling.
+        :param temBuf: Data of each channel within one packet
         :return:
         """
-        # 采样率为1000时不用做什么
+        # No resampling needed at 1000 Hz
         if self.sample_rate == 1000:
             return temBuf
         oldTriggerChannel = temBuf[-1]
-        # 新trigger通道
+        # New trigger channel
         newTriggerChannel = [0] * len(temBuf[0])
-        # 重采样比率
+        # Resampling ratio
         rate = 1000 / self.sample_rate
         for i in range(len(oldTriggerChannel)):
             if oldTriggerChannel[i] > 0:
@@ -783,13 +783,13 @@ class DataServerThread:
 
     def isDataPacketLost(self, dataStruct):
         """
-        通过时间戳，验证是否数据包丢失
-        :param dataStruct:解析好的数据包
+        Verify whether data packets were lost by checking timestamps.
+        :param dataStruct: Parsed data packet
         :return:
         """
         if self.state == ConnectState.RUNNING and self.firstTimestamp == -1:
             self.firstTimestamp = dataStruct["startTimeStamp"]
-        # 通过时间戳验证是否丢包
+        # Verify packet loss via timestamps
         if self.lastTimestamp > 0 and self.lastTimestamp != dataStruct["startTimeStamp"]:
             raise RuntimeError(
                 "Maybe a packet loss happened. Expected startTimestamp "
@@ -799,115 +799,115 @@ class DataServerThread:
 
     def combineDataAndTrigger(self):
         """
-        组包的具体过程
+        Actual packet assembly process.
         :return:
         """
-        # 所有通道的buffer，最后一个通道是trigger的数据
+        # Buffer for all channels; the last channel is trigger data
         temp_buffer = []
         for i in range(self.n_chan):
             temp_buffer.append([])
-        # 把数据包放到前面通道的位置
+        # Place data packets into the preceding channels
         for i in range(self.max_single_packet):
             data = self.single_module_data_buffer[i]['modules'][self.serialNumber]['data']
             for ch in range(self.n_chan - 1):
                 temp_buffer[ch].extend(data[ch])
-        # temp_buffer最后一个通道初始化为0
+        # Initialize the last channel of temp_buffer to 0
         temp_buffer[-1] = [0] * len(temp_buffer[0])
-        # 计算每包数据点dataCount，转发时长 * 采样率 / 1000
+        # Calculate data points per packet: forwarding duration * sample_rate / 1000
         dataCount = int(self.single_module_data_buffer[0]['timeStampLength'] * self.sample_rate / 1000)
-        # 得到这批数据的时间戳
+        # Get timestamps for this batch of data
         totalTimestamp = []
         for i in range(self.max_single_packet):
             totalTimestamp.append(self.single_module_data_buffer[i]['startTimeStamp'])
-        # 倒着遍历，可以删除那些组到数据包中的trigger包
+        # Iterate in reverse to safely remove trigger packets that are assembled into data
         for i in range(len(self.single_module_trigger_buffer) - 1, -1, -1):
             startTimestamp = self.single_module_trigger_buffer[i]['startTimeStamp']
-            # 找到这个trigger包的时间戳在数据包的所有时间戳中的位置
+            # Find the position of this trigger's timestamp among all data timestamps
             index = self.FindTriggerTimeStampIndex(totalTimestamp, startTimestamp, dataCount)
-            # 这个trigger的时间戳比这组数据中最大的时间戳还大，继续循环
+            # Trigger timestamp exceeds the max in this batch, continue
             if index == -1:
                 continue
-            # 这个trigger的时间戳比这组数据中最小的时间戳还小，舍弃这个trigger
+            # Trigger timestamp is less than the min in this batch, discard it
             elif index == -2:
-                # 去除掉这个trigger
+                # Remove this trigger
                 self.single_module_trigger_buffer.pop(i)
             else:
-                # 把trigger的值放到对应的位置
+                # Place the trigger value at the corresponding position
                 temp_buffer[-1][index] = self.single_module_trigger_buffer[i]['modules'][0]['data'][0][0]
-                # 去除掉这个trigger
+                # Remove this trigger
                 self.single_module_trigger_buffer.pop(i)
         temp_buffer = np.array(temp_buffer)
-        # 把组好的包送入Buffer
+        # Send the assembled packet into the buffer
         if self.state == ConnectState.RUNNING:
             self.buffer.appendBuffer(temp_buffer)
-            # 也送一份到save_buffer里，验证正确性
+            # Also send to save_buffer for correctness verification
             self.save_buffer.appendBuffer(temp_buffer)
-        # 清空缓存的数据包
+        # Clear cached data packets
         self.single_module_data_buffer = []
 
     def FindTriggerTimeStampIndex(self, totalTimestamp, triggerTimeStamp, dataCount):
         """
-        找到trigger的时间戳在这组数据中的位置
-        :param totalTimestamp:这批数据包所有的时间戳
-        :param triggerTimeStamp:当前Trigger的时间戳
-        :param dataCount:每包数据点
+        Find the position of a trigger's timestamp within this batch of data.
+        :param totalTimestamp: All timestamps of this batch of data packets
+        :param triggerTimeStamp: Timestamp of the current trigger
+        :param dataCount: Data points per packet
         :return:
         """
-        # currentTimeStamp比totalTimestamp中最大的时间戳还大，要保留
+        # Trigger timestamp exceeds the max in totalTimestamp, keep it
         if triggerTimeStamp > totalTimestamp[-1]:
             return -1
-        # currentTimeStamp比totalTimestamp中最小的时间戳还小，要舍弃
+        # Trigger timestamp is less than the min in totalTimestamp, discard it
         if triggerTimeStamp < totalTimestamp[0]:
             return -2
-        # 不是以上两种情况就先找到离这个时间戳最近的数据包的时间戳的位置
-        # 就是第几个数据包的位置
+        # Otherwise, find the nearest data packet timestamp position
+        # i.e., which data packet it belongs to
         properTimeStampIndex = -1
         for timeStamp in totalTimestamp:
             if timeStamp <= triggerTimeStamp:
                 properTimeStampIndex += 1
             else:
-                # 出现第一个大于trigger时间戳就说明找到了
+                # Found the first timestamp greater than the trigger's
                 break
-        # 如果找到的时间戳正好和trigger的时间戳相等
-        # 就把这个时间戳直接放到对应的数据包的第一个位置
+        # If the found timestamp exactly matches the trigger's timestamp,
+        # place it at the first position of the corresponding data packet
         if totalTimestamp[properTimeStampIndex] == triggerTimeStamp:
             index = properTimeStampIndex * dataCount
         else:
-            # 如果找到的时间戳正好比trigger的时间戳小，就分采样率讨论
-            # 采样率大于等于1000时，找到精确的时间戳的位置
+            # If the found timestamp is less than the trigger's, handle by sample rate
+            # For sample rate >= 1000, find the precise timestamp position
             if self.sample_rate >= 1000:
-                # 这个包内部计算时间戳精确位置
+                # Calculate precise timestamp position within this packet
                 subTimeStampIndex = (triggerTimeStamp - totalTimestamp[properTimeStampIndex]) * int(self.sample_rate / 1000)
-                # 最终的位置就是包开始的位置+包内的位置
+                # Final position = packet start position + offset within packet
                 index = properTimeStampIndex * dataCount + subTimeStampIndex
             else:
-                # 采样率<1000时，就直接放到对应数据包的第一个位置
+                # For sample rate < 1000, place at the first position of the corresponding packet
                 index = properTimeStampIndex * dataCount
         return index
 
     def GetDataLenCount(self):
         """
-        用于统计更新了多少数据
+        Get the count of newly updated data points.
         :return:
         """
         return self.buffer.nUpdate
 
     def ResetDataLenCount(self):
         """
-        重置已经更新的数据量
+        Reset the count of updated data points.
         :return:
         """
         self.buffer.nUpdate = 0
 
     def ResetTriggerChanofBuff(self):
         """
-        把Trigger通道的值都置为0
+        Set all values in the trigger channel to 0.
         """
         self.buffer.buffer[-1, :] = np.zeros((1, self.buffer.buffer.shape[-1]))
 
     def GetBufferData(self):
         """
-        获取buffer中的数据
+        Get data from the buffer.
         :return:
         """
         return self.buffer.getData()
@@ -947,7 +947,7 @@ class DataServerThread:
 
     def save_timeStamp(self):
         """
-        保存时间戳
+        Save timestamps to file.
         :return:
         """
         with open('./test_time_stamp.pickle', 'wb') as f:
@@ -955,33 +955,34 @@ class DataServerThread:
 
 
 #################################################################################
-# 此main方法为了测试保存数据功能而写
-# 即：将接收到的Jellyfish转发的数据，存储成bdf文件（test.bdf）
-#    trigger和数据放在同一文件中
-#    BDF文件存储时，时间分辨率是1秒，所以能够保存的Trigger数据就是存储数据的秒数
-#    即使收到了更多的trigger，也只能保存数据量秒数这些trigger
-# ① t_buffer是buffer的长度，单位为秒，也是最大可保存的数据时长
-# ② 构造DataServerThread时的采样率要和Jellyfish的脑电设备采样率保持一致
-# ③ 为了对比这里存出来的test.bdf文件和Jellyfish录制的文件一致性，
-#    需要使用 test_data_validation.py来进行后续处理，详情请参考该文件的说明
+# This main method is written to test the data saving functionality.
+# It receives data forwarded by JellyFish and saves it as a BDF file (test.bdf).
+#    Trigger and data are stored in the same file.
+#    BDF file storage has 1-second time resolution, so the saveable trigger count
+#    equals the number of seconds of stored data.
+#    Even if more triggers are received, only as many as the data duration can be saved.
+# 1) t_buffer is the buffer length in seconds, also the max saveable data duration.
+# 2) The sample rate when constructing DataServerThread must match the JellyFish EEG device sample rate.
+# 3) To compare the test.bdf file saved here with the file recorded by JellyFish,
+#    use test_data_validation.py for post-processing. See that file for details.
 #################################################################################
 if __name__ == "__main__":
-    # sample_rate要和Jellyfish采集数据的采样率相同
+    # sample_rate must match the JellyFish device sampling rate
     w4_data = DataServerThread(sample_rate=1000, t_buffer=60)
 
-    # 连接JellyFish的数据转发
+    # Connect to JellyFish data forwarding
     notconnect = w4_data.connect()
     if notconnect:
         raise TypeError("Can't connect JellyFish, Please open the hostport ")
-    # meta包还没解析好就等待
+    # Wait until meta packet is resolved
     while not w4_data.isReady():
         continue
 
-    # 开始
+    # Start
     w4_data.start()
     print('start')
-    # 保存xx秒数据
-    # time.sleep中的秒数不要超过t_buffer的数值
+    # Save data for N seconds
+    # The seconds in time.sleep should not exceed the t_buffer value
     time.sleep(30)
     w4_data.stop()
     print('packet_count', w4_data.packet_count)

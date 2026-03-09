@@ -1,13 +1,13 @@
 """
 Benchmark for Offline Generation with Three Different Methods:
-1. EEG Feature Guidance (MindPilot) - 使用目标脑电特征作为优化目标
-2. Target Image Guidance (Ceiling) - 使用目标图像的CLIP embedding作为优化目标
-3. Random Generation (Null) - 完全随机生成，不做任何优化（null baseline）
+1. EEG Feature Guidance (MindPilot) - Uses target EEG features as the optimization objective
+2. Target Image Guidance (Ceiling) - Uses the target image's CLIP embedding as the optimization objective
+3. Random Generation (Null) - Purely random generation without any optimization (null baseline)
 
-评估方式：
-所有方法都使用相同的评估标准：
-- EEG Score: 生成图像 vs 目标图像的脑电特征相似度
-- CLIP Score: 生成图像 vs 目标图像的CLIP embedding相似度 
+Evaluation:
+All methods are evaluated using the same criteria:
+- EEG Score: EEG feature similarity between generated images and target images
+- CLIP Score: CLIP embedding similarity between generated images and target images
 ./run_benchmark.sh
 """
 
@@ -42,7 +42,7 @@ from model.pseudo_target_model import PseudoTargetModel
 import matplotlib.pyplot as plt
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# --- 模型初始化 ---
+# --- Model Initialization ---
 print("Loading models...")
 model_type = 'ViT-H-14'
 vlmodel, preprocess_train, feature_extractor = open_clip.create_model_and_transforms(
@@ -52,7 +52,7 @@ vlmodel.to(device)
 generator = Generator4Embeds(device=device)
 pipe = generator.pipe
 
-# --- 目录配置 ---
+# --- Directory Configuration ---
 image_dir = '/home/ldy/Workspace/Closed_loop_optimizing/test_images'
 embed_dir = '/home/ldy/Workspace/Closed_loop_optimizing/data/clip_embed/2025-09-21'
 
@@ -173,7 +173,7 @@ def generate_eeg_from_image_paths(model_path, test_image_list, device):
 
 
 def generate_eeg_from_images(model_path, images, device):
-    """从PIL图像列表生成EEG"""
+    """Generate EEG signals from a list of PIL images."""
     def preprocess_gen_img(img, dev):
         t = transforms.Compose([
             transforms.Resize((224, 224)), 
@@ -196,7 +196,7 @@ def generate_eeg_from_images(model_path, images, device):
 
 
 def compute_eeg_similarity(eeg, eeg_model, target_feature, sub, device):
-    """计算EEG相似度"""
+    """Compute EEG similarity."""
     eeg_feature = get_eeg_features(eeg_model, torch.tensor(eeg).unsqueeze(0), device, sub)    
     similarity = torch.nn.functional.cosine_similarity(eeg_feature.to(device), target_feature.to(device))
     similarity = (similarity + 1) / 2
@@ -204,11 +204,11 @@ def compute_eeg_similarity(eeg, eeg_model, target_feature, sub, device):
 
 
 def compute_clip_similarity(images, target_clip_embed, vlmodel, preprocess_train, device):
-    """计算CLIP相似度"""
+    """Compute CLIP similarity."""
     tensor_images = [preprocess_train(img) for img in images]
     with torch.no_grad():
         image_embeds = vlmodel.encode_image(torch.stack(tensor_images).to(device))
-        # 归一化
+        # Normalize
         image_embeds = F.normalize(image_embeds, dim=-1)
         target_clip_embed = F.normalize(target_clip_embed, dim=-1)
         similarities = F.cosine_similarity(image_embeds, target_clip_embed)
@@ -218,37 +218,37 @@ def compute_clip_similarity(images, target_clip_embed, vlmodel, preprocess_train
 
 def run_single_experiment(method, target_idx, seed, config):
     """
-    运行单次实验
+    Run a single experiment.
     
     Args:
         method: "eeg_guidance", "target_image_guidance", "random_generation"
-        target_idx: 目标图像索引
-        seed: 随机种子
-        config: 配置字典
+        target_idx: Target image index
+        seed: Random seed
+        config: Configuration dictionary
     
     Returns:
-        results: 包含各种评估指标的字典
+        results: Dictionary containing various evaluation metrics
     """
     print(f"\n{'='*80}")
     print(f"Method: {method} | Target: {target_idx} | Seed: {seed}")
     print(f"{'='*80}")
     
-    # 设置随机种子
+    # Set random seed
     random.seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
     
-    # 加载目标数据
+    # Load target data
     target_image_path = os.path.join(image_dir, image_list[target_idx])
     target_eeg_embed_path = os.path.join(embed_dir, embed_list[target_idx])
     target_eeg_feature = torch.load(target_eeg_embed_path, weights_only=False)
     
-    # 加载目标图像的CLIP embedding
+    # Load the target image's CLIP embedding
     target_image_pil = Image.open(target_image_path).convert("RGB")
     with torch.no_grad():
         target_clip_embed = vlmodel.encode_image(preprocess_train(target_image_pil).unsqueeze(0).to(device))
     
-    # 加载EEG模型
+    # Load EEG model
     sub = 'sub-01'
     dnn = 'alexnet'
     f_encoder = "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth"
@@ -257,7 +257,7 @@ def run_single_experiment(method, target_idx, seed, config):
     eeg_model.load_state_dict(checkpoint['eeg_model_state_dict'])
     encoding_model_path = f'/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/{sub}/synthetic_eeg_data/encoding-end_to_end/dnn-{dnn}/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt'
     
-    # 获取图像池
+    # Get image pool
     def get_image_pool(image_set_path):
         test_images_path = []
         for root, dirs, files in os.walk(image_set_path):
@@ -272,17 +272,17 @@ def run_single_experiment(method, target_idx, seed, config):
     
     print(f"Available images in pool (excluding target): {len(test_images_path)}")
     
-    # 对于 random_generation 方法，直接跳转到生成部分
+    # For random_generation, skip directly to the generation section
     if method == "random_generation":
         print("Method 3: Random Generation (Null) - Skipping offline data, pure random generation...")
-        # 直接跳到 random_generation 的生成代码部分
-        # 不需要采样、不需要计算 embeddings、不需要计算 rewards
-        pass  # 将在后面的 if-elif 中处理
+        # Skip to the random_generation code section
+        # No sampling, embedding computation, or reward computation needed
+        pass  # Handled in the if-elif block below
     else:
-        # 采样离线数据（仅对需要优化的方法）
+        # Sample offline data (only for methods that require optimization)
         OFFLINE_BATCH_SIZE = config['offline_batch_size']
         
-        # 检查边界情况
+        # Check edge cases
         if len(test_images_path) == 0:
             raise ValueError(f"No images available for sampling! Image directory: {image_dir}")
         
@@ -299,13 +299,13 @@ def run_single_experiment(method, target_idx, seed, config):
         
         sampled_images = [Image.open(p).convert("RGB") for p in sampled_paths]
         
-        # 计算CLIP Embeddings
+        # Compute CLIP embeddings
         print("Encoding images to CLIP space...")
         tensor_images = [preprocess_train(img) for img in sampled_images]
         with torch.no_grad():
             offline_embeds = vlmodel.encode_image(torch.stack(tensor_images).to(device))
     
-    # 根据方法选择不同的reward计算方式
+    # Choose reward computation strategy based on method
     if method == "eeg_guidance":
         # Method 1: EEG Feature Guidance (MindPilot)
         print("Method 1: EEG Feature Guidance - Computing EEG rewards...")
@@ -321,26 +321,26 @@ def run_single_experiment(method, target_idx, seed, config):
         print("Method 2: Target Image Guidance - Computing CLIP rewards with target image...")
         offline_rewards = []
         for embed in offline_embeds:
-            # 计算与目标图像CLIP embedding的相似度
+            # Compute similarity with target image's CLIP embedding
             sim = F.cosine_similarity(embed.unsqueeze(0), target_clip_embed, dim=-1)
             sim = (sim + 1) / 2
             offline_rewards.append(sim.item())
             
     elif method == "random_generation":
         # Method 3: Random Generation (Null baseline)
-        # 完全随机生成，不做任何优化
+        # Fully random generation, no optimization
         print("Method 3: Random Generation (Null) - No optimization, pure random generation...")
         
-        # 创建Generator（不进行优化训练）
+        # Create Generator (without optimization training)
         print(f"Initializing Generator with seed {seed}...")
         Generator = HeuristicGenerator(pipe, vlmodel, preprocess_train, device=device, seed=seed)
         
-        # random_generation 分支没有创建 offline_embeds，不需要清理
+        # random_generation branch did not create offline_embeds, no cleanup needed
         torch.cuda.empty_cache()
         
-        # 直接随机生成（不加载任何优化数据）
+        # Generate randomly without loading any optimization data
         print("Generating random images without optimization...")
-        # 创建随机噪声
+        # Create random noise
         epsilon = torch.randn(
             Generator.num_inference_steps + 1, 
             Generator.generate_batch_size,
@@ -351,7 +351,7 @@ def run_single_experiment(method, target_idx, seed, config):
             generator=Generator.generator
         )
         
-        # 随机初始化 pseudo target（不进行优化）
+        # Randomly initialize pseudo target (without optimization)
         random_pseudo_target = torch.randn(
             Generator.generate_batch_size, 
             Generator.dimension, 
@@ -359,7 +359,7 @@ def run_single_experiment(method, target_idx, seed, config):
             generator=Generator.generator
         )
         
-        # 直接生成，不经过优化循环
+        # Generate directly, bypassing the optimization loop
         latents = Generator.pipe(
             [''] * Generator.generate_batch_size,
             ip_adapter_image_embeds=[random_pseudo_target.unsqueeze(0).type(torch.bfloat16).to(device)],
@@ -378,13 +378,13 @@ def run_single_experiment(method, target_idx, seed, config):
     else:
         raise ValueError(f"Unknown method: {method}")
     
-    # 对于非随机生成的方法，执行优化
+    # For non-random generation methods, perform optimization
     if method != "random_generation":
         offline_rewards_tensor = torch.tensor(offline_rewards).to(device)
         print(f"Max Reward in offline batch: {max(offline_rewards):.4f}")
         torch.cuda.empty_cache()
         
-        # 创建Generator并训练
+        # Create Generator and train
         print(f"Initializing Generator with seed {seed}...")
         Generator = HeuristicGenerator(pipe, vlmodel, preprocess_train, device=device, seed=seed)
         Generator.pseudo_target_model = PseudoTargetModel(dimension=1024, noise_level=1e-4).to(device)
@@ -393,7 +393,7 @@ def run_single_experiment(method, target_idx, seed, config):
             (-offline_rewards_tensor * Generator.reward_scaling_factor).to(device)
         )
         
-        # 生成图像
+        # Generate images
         print("Running offline generation...")
         final_images = Generator.generate(
             data_x=offline_embeds,
@@ -404,12 +404,12 @@ def run_single_experiment(method, target_idx, seed, config):
         )
         torch.cuda.empty_cache()
         
-        # 清理优化相关数据
+        # Clean up optimization-related data
         del offline_embeds
         del offline_rewards_tensor
         torch.cuda.empty_cache()
     
-    # 保存生成的图像
+    # Save generated images
     save_dir = os.path.join(config['save_path'], method, f'target_{target_idx}')
     os.makedirs(save_dir, exist_ok=True)
     
@@ -421,17 +421,17 @@ def run_single_experiment(method, target_idx, seed, config):
         saved_image_paths.append(save_name)
         final_images_copy.append(Image.open(save_name).convert("RGB"))
     
-    # 清理Generator
-    print("清理 Generator 和离线数据...")
+    # Clean up Generator
+    print("Cleaning up Generator and offline data...")
     del Generator
     del final_images
-    # 对于非随机生成的方法，offline 数据已在前面清理
+    # For non-random generation methods, offline data was already cleaned up above
     if method == "random_generation":
-        # random_generation 方法的 offline 数据已经提前清理
+        # Offline data for random_generation was already cleaned up earlier
         pass
     torch.cuda.empty_cache()
     
-    # 评估：计算EEG相似度
+    # Evaluation: compute EEG similarity
     print("Computing EEG similarity...")
     recon_eegs = generate_eeg_from_images(encoding_model_path, final_images_copy, device)
     eeg_scores = []
@@ -441,26 +441,26 @@ def run_single_experiment(method, target_idx, seed, config):
     del recon_eegs
     torch.cuda.empty_cache()
     
-    # 评估：计算CLIP相似度
+    # Evaluation: compute CLIP similarity
     print("Computing CLIP similarity...")
     clip_scores = compute_clip_similarity(final_images_copy, target_clip_embed, vlmodel, preprocess_train, device)
     
-    # 清理
+    # Clean up
     del eeg_model
     del target_eeg_feature
     del target_clip_embed
     del final_images_copy
     torch.cuda.empty_cache()
     
-    # 返回结果
+    # Return results
     results = {
         'method': method,
-        'target_idx': int(target_idx),  # 确保是 Python int
+        'target_idx': int(target_idx),  # Ensure Python int
         'seed': int(seed),
-        'eeg_scores': eeg_scores,  # 已经是 Python list of float
-        'clip_scores': clip_scores.tolist(),  # 转换为 Python list
-        'avg_eeg_score': float(np.mean(eeg_scores)),  # 转换为 Python float
-        'avg_clip_score': float(np.mean(clip_scores)),  # 转换为 Python float
+        'eeg_scores': eeg_scores,  # Already a Python list of float
+        'clip_scores': clip_scores.tolist(),  # Convert to Python list
+        'avg_eeg_score': float(np.mean(eeg_scores)),  # Convert to Python float
+        'avg_clip_score': float(np.mean(clip_scores)),  # Convert to Python float
         'saved_paths': saved_image_paths
     }
     
@@ -469,11 +469,11 @@ def run_single_experiment(method, target_idx, seed, config):
 
 
 def generate_benchmark_report(all_results, config):
-    """生成benchmark报告"""
+    """Generate benchmark report."""
     save_path = config['save_path']
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # 1. 创建DataFrame
+    # 1. Create DataFrame
     records = []
     for result in all_results:
         for i, (eeg_score, clip_score) in enumerate(zip(result['eeg_scores'], result['clip_scores'])):
@@ -488,12 +488,12 @@ def generate_benchmark_report(all_results, config):
     
     df = pd.DataFrame(records)
     
-    # 保存详细结果
+    # Save detailed results
     csv_path = os.path.join(save_path, f'detailed_results_{timestamp}.csv')
     df.to_csv(csv_path, index=False)
-    print(f"\n详细结果已保存到: {csv_path}")
+    print(f"\nDetailed results saved to: {csv_path}")
     
-    # 2. 计算汇总统计
+    # 2. Compute summary statistics
     summary_stats = df.groupby('Method').agg({
         'EEG_Score': ['mean', 'std', 'min', 'max'],
         'CLIP_Score': ['mean', 'std', 'min', 'max']
@@ -501,19 +501,19 @@ def generate_benchmark_report(all_results, config):
     
     summary_path = os.path.join(save_path, f'summary_statistics_{timestamp}.csv')
     summary_stats.to_csv(summary_path)
-    print(f"汇总统计已保存到: {summary_path}")
+    print(f"Summary statistics saved to: {summary_path}")
     
-    # 打印汇总统计
+    # Print summary statistics
     print(f"\n{'='*80}")
     print("BENCHMARK SUMMARY STATISTICS")
     print(f"{'='*80}")
     print(summary_stats)
     print(f"{'='*80}\n")
     
-    # 3. 生成可视化对比图
+    # 3. Generate comparison visualizations
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     
-    # EEG Score对比
+    # EEG Score comparison
     method_names = {
         'eeg_guidance': 'EEG Guidance\n(MindPilot)',
         'target_image_guidance': 'Target Image\n(Ceiling)',
@@ -527,7 +527,7 @@ def generate_benchmark_report(all_results, config):
     axes[0].set_ylabel('EEG Score', fontsize=12)
     axes[0].grid(True, alpha=0.3)
     
-    # CLIP Score对比
+    # CLIP Score comparison
     sns.boxplot(data=df, x='Method_Label', y='CLIP_Score', ax=axes[1])
     axes[1].set_title('CLIP Similarity Score', fontsize=14, fontweight='bold')
     axes[1].set_xlabel('Method', fontsize=12)
@@ -537,10 +537,10 @@ def generate_benchmark_report(all_results, config):
     plt.tight_layout()
     plot_path = os.path.join(save_path, f'benchmark_comparison_{timestamp}.png')
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-    print(f"对比图已保存到: {plot_path}")
+    print(f"Comparison plot saved to: {plot_path}")
     plt.close()
     
-    # 4. 生成条形图对比
+    # 4. Generate bar chart comparison
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     
     summary_mean = df.groupby('Method')[['EEG_Score', 'CLIP_Score']].mean()
@@ -549,7 +549,7 @@ def generate_benchmark_report(all_results, config):
     methods = list(method_names.keys())
     method_labels = [method_names[m] for m in methods]
     
-    # EEG Score条形图
+    # EEG Score bar chart
     eeg_means = [summary_mean.loc[m, 'EEG_Score'] for m in methods]
     eeg_stds = [summary_std.loc[m, 'EEG_Score'] for m in methods]
     axes[0].bar(method_labels, eeg_means, yerr=eeg_stds, capsize=5, alpha=0.7, color=['#2ecc71', '#3498db', '#e74c3c'])
@@ -557,7 +557,7 @@ def generate_benchmark_report(all_results, config):
     axes[0].set_ylabel('EEG Score', fontsize=12)
     axes[0].grid(True, alpha=0.3, axis='y')
     
-    # CLIP Score条形图
+    # CLIP Score bar chart
     clip_means = [summary_mean.loc[m, 'CLIP_Score'] for m in methods]
     clip_stds = [summary_std.loc[m, 'CLIP_Score'] for m in methods]
     axes[1].bar(method_labels, clip_means, yerr=clip_stds, capsize=5, alpha=0.7, color=['#2ecc71', '#3498db', '#e74c3c'])
@@ -568,11 +568,11 @@ def generate_benchmark_report(all_results, config):
     plt.tight_layout()
     bar_plot_path = os.path.join(save_path, f'benchmark_barplot_{timestamp}.png')
     plt.savefig(bar_plot_path, dpi=300, bbox_inches='tight')
-    print(f"条形图已保存到: {bar_plot_path}")
+    print(f"Bar chart saved to: {bar_plot_path}")
     plt.close()
     
-    # 5. 保存JSON格式的完整结果
-    # 将 summary_stats 转换为可序列化的格式（展平多级列索引）
+    # 5. Save complete results in JSON format
+    # Convert summary_stats to serializable format (flatten multi-level column index)
     summary_dict = {}
     for method in summary_stats.index:
         summary_dict[method] = {
@@ -600,20 +600,20 @@ def generate_benchmark_report(all_results, config):
     json_path = os.path.join(save_path, f'complete_results_{timestamp}.json')
     with open(json_path, 'w') as f:
         json.dump(json_results, f, indent=2)
-    print(f"完整结果JSON已保存到: {json_path}")
+    print(f"Complete results JSON saved to: {json_path}")
     
     return df, summary_stats
 
 
 def main():
-    """主函数：运行三种方法的benchmark"""
+    """Main function: run benchmark for three methods."""
     
-    # 配置参数
+    # Configuration parameters
     config = {
-        # 'target_indices': [i for i in range(30)],  # 要测试的目标图像索引
+        # 'target_indices': [i for i in range(30)],  # Target image indices to test
         'target_indices': np.linspace(1, 200, 30, dtype=int).tolist(),
-        'num_seeds': 1,  # 每个方法运行的随机种子数
-        'offline_batch_size': 10,  # 离线数据批量大小
+        'num_seeds': 1,  # Number of random seeds per method
+        'offline_batch_size': 10,  # Offline data batch size
         'save_path': '/home/ldy/Workspace/Closed_loop_optimizing/outputs/benchmark_offline_generation',
         'methods': ['eeg_guidance', 'target_image_guidance', 'random_generation']
     }
@@ -631,7 +631,7 @@ def main():
     
     all_results = []
     
-    # 运行所有实验
+    # Run all experiments
     for target_idx in config['target_indices']:
         for method in config['methods']:
             for seed in range(config['num_seeds']):
@@ -646,7 +646,7 @@ def main():
                     torch.cuda.empty_cache()
                     continue
     
-    # 生成报告
+    # Generate report
     if all_results:
         print(f"\n{'='*80}")
         print("GENERATING BENCHMARK REPORT...")

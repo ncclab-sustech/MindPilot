@@ -1,13 +1,13 @@
 """
 Benchmark Framework for Comparing Different Optimization Methods (Extended Version)
-对比 7 种方法：
-  1. PseudoModel (Offline)         - 离线采样 + GP优化
-  2. HeuristicClosedLoop          - 闭环迭代（融合+贪婪采样）
-  3. DDPO                          - 强化学习（PPO）
-  4. DPOK                          - 强化学习（KL正则化）
-  5. D3PO                          - 强化学习（DPO）
-  6. BayesianOpt                   - 贝叶斯优化
-  7. CMA-ES                        - 进化策略
+Compares 7 methods:
+  1. PseudoModel (Offline)         - Offline sampling + GP optimization
+  2. HeuristicClosedLoop          - Closed-loop iteration (fusion + greedy sampling)
+  3. DDPO                          - Reinforcement learning (PPO)
+  4. DPOK                          - Reinforcement learning (KL regularization)
+  5. D3PO                          - Reinforcement learning (DPO)
+  6. BayesianOpt                   - Bayesian optimization
+  7. CMA-ES                        - Evolution strategy
 """
 
 # CUDA_VISIBLE_DEVICES=1 python benchmark_framework_total.py --config benchmark_config_total.json --exp exp1
@@ -16,11 +16,11 @@ Benchmark Framework for Comparing Different Optimization Methods (Extended Versi
 import os
 import sys
 
-# ⚠️ 重要：在导入其他模块前先设置环境变量，防止被覆盖
-# 如果命令行已设置 CUDA_VISIBLE_DEVICES，则使用命令行的值
+# Important: set environment variables before importing other modules to prevent overwriting
+# If CUDA_VISIBLE_DEVICES is already set via command line, use that value
 if 'CUDA_VISIBLE_DEVICES' not in os.environ:
-    # 如果没有设置，使用默认值（可以在这里修改）
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # 默认使用GPU 0
+    # If not set, use default value (modify here as needed)
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # Default to GPU 0
 
 import time
 import json
@@ -40,23 +40,23 @@ sys.path.append('/home/ldy/Workspace/Closed_loop_optimizing/model')
 
 @dataclass
 class BenchmarkResult:
-    """单次实验结果"""
+    """Single experiment result"""
     method_name: str
     target_idx: int
     seed: int
     
-    # 性能指标
+    # Performance metrics
     eeg_similarity: float
     clip_score: float = None
     aesthetic_score: float = None
     ssim: float = None
     
-    # 效率指标
+    # Efficiency metrics
     time_seconds: float = 0.0
     gpu_memory_gb: float = 0.0
     n_samples_used: int = 0
     
-    # 其他信息
+    # Additional information
     success: bool = True
     error_message: str = None
     
@@ -65,7 +65,7 @@ class BenchmarkResult:
 
 
 # ==================== HeuristicGenerator Class ====================
-# 严格按照 exp-benchmark_heuristic_generation.py 的实现
+# Strictly follows the implementation from exp-benchmark_heuristic_generation.py
 
 import einops
 import torch.nn.functional as F
@@ -73,8 +73,8 @@ from model.pseudo_target_model import PseudoTargetModel
 
 class HeuristicGenerator:
     """
-    严格按照 exp-benchmark_heuristic_generation.py 实现的 HeuristicGenerator
-    用于 HeuristicClosedLoop 方法中的融合生成
+    HeuristicGenerator strictly following the exp-benchmark_heuristic_generation.py implementation.
+    Used for fusion-based generation in the HeuristicClosedLoop method.
     """
     def __init__(self, pipe, vlmodel, preprocess_train, device="cuda", seed=42, load_ip_adapter=False, min_data_threshold=10):
         self.pipe = pipe
@@ -85,7 +85,7 @@ class HeuristicGenerator:
         # Hyperparameters
         self.batch_size = 32
         self.alpha = 80
-        self.total_steps = 15  # 🔥 关键：15步优化
+        self.total_steps = 15  # Key: 15-step optimization
         self.max_inner_steps = 10
         self.num_inference_steps = 8
         self.guidance_scale = 0.0
@@ -96,7 +96,7 @@ class HeuristicGenerator:
         self.decay_rate = 0.1
         self.generate_batch_size = 1
         self.save_per = 5
-        self.min_data_threshold = min_data_threshold  # 最小数据量阈值
+        self.min_data_threshold = min_data_threshold  # Minimum data size threshold
 
         # Initialize components
         self.pseudo_target_model = PseudoTargetModel(dimension=self.dimension, noise_level=1e-4).to(self.device)
@@ -152,7 +152,7 @@ class HeuristicGenerator:
 
     def generate(self, data_x, data_y, tar_image_embed, prompt='', save_path=None, start_embedding=None):
         """
-        🔥 核心方法：包含15步GP优化 + 最终生成
+        Core method: includes 15-step GP optimization + final generation
         """
         # Initialize noise
         epsilon = torch.randn(self.num_inference_steps+1, self.generate_batch_size, 
@@ -177,12 +177,12 @@ class HeuristicGenerator:
         else:
             pseudo_target = torch.randn(self.generate_batch_size, self.dimension, device=self.device, generator=self.generator)
 
-        # 🔥 关键：15步优化循环 - 只优化 pseudo_target，不生成图像
+        # Key: 15-step optimization loop - only optimizes pseudo_target, no image generation
         for step in range(self.total_steps):
             data_x, data_y = self.pseudo_target_model.get_model_data()   
-            if data_y.size(0) < self.min_data_threshold:  # 检查数据量是否足够
+            if data_y.size(0) < self.min_data_threshold:  # Check if data size is sufficient
                 print(f"[WARNING] Insufficient data ({data_y.size(0)} < {self.min_data_threshold}), returning random generation")
-                # 数据不足，生成随机图像并返回
+                # Insufficient data, generate random image and return
                 latents = self.pipe(
                     [prompt]*self.generate_batch_size,
                     ip_adapter_image_embeds=[pseudo_target.unsqueeze(0).type(torch.bfloat16).to(self.device)],
@@ -195,11 +195,11 @@ class HeuristicGenerator:
                 ).images
                 return self.latents_to_images(latents)
             
-            # 数据足够，只进行 pseudo_target 优化（不生成图像）
+            # Data is sufficient, only perform pseudo_target optimization (no image generation)
             step_size = self.initial_step_size / (1 + self.decay_rate * step)
             pseudo_target, _ = self.pseudo_target_model.estimate_pseudo_target(pseudo_target, step_size=step_size)
 
-        # 🔥 优化循环结束后，用优化好的 pseudo_target 生成最终图像
+        # After optimization loop ends, generate final image using the optimized pseudo_target
         final_latents = self.pipe(
                 [prompt]*self.generate_batch_size,
                 ip_adapter_image_embeds=[pseudo_target.unsqueeze(0).type(torch.bfloat16).to(self.device)],
@@ -213,7 +213,7 @@ class HeuristicGenerator:
         
         final_images = self.latents_to_images(final_latents)
         
-        # 清理generate函数的所有中间变量
+        # Clean up all intermediate variables from the generate function
         del epsilon, epsilon_init, epsilon_init_norm, pseudo_target, final_latents
         torch.cuda.empty_cache()
         
@@ -223,25 +223,25 @@ class HeuristicGenerator:
 # ==================== BaseMethod Class ====================
 
 class BaseMethod:
-    """所有方法的基类 - 提供共用的工具方法"""
+    """Base class for all methods - provides shared utility methods"""
     
     def __init__(self, config: dict, device: str = "cuda"):
         self.config = config
         self.device = device
         self.name = "BaseMethod"
         
-        # 子类可以设置这些属性，基类方法将使用它们
+        # Subclasses can set these attributes; base class methods will use them
         self.eeg_model = None
         self.encoding_model = None
         
     def optimize(self, target_eeg_feature, target_idx: int, budget: int = 50) -> Dict[str, Any]:
         """
-        优化并生成图像
+        Optimize and generate images
         
         Args:
-            target_eeg_feature: 目标EEG特征
-            target_idx: 目标索引
-            budget: 采样预算
+            target_eeg_feature: Target EEG feature
+            target_idx: Target index
+            budget: Sampling budget
             
         Returns:
             result: {
@@ -256,13 +256,13 @@ class BaseMethod:
         raise NotImplementedError
         
     def reset(self):
-        """重置方法状态（用于多次实验）"""
+        """Reset method state (for repeated experiments)"""
         pass
     
-    # ==================== 共用工具方法 ====================
+    # ==================== Shared Utility Methods ====================
     
     def _load_eeg_model(self, model_path):
-        """加载EEG模型（ATMS）"""
+        """Load EEG model (ATMS)"""
         from model.ATMS_retrieval import ATMS
         eeg_model = ATMS()
         checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
@@ -272,7 +272,7 @@ class BaseMethod:
         return eeg_model
     
     def _load_encoding_model(self, model_path):
-        """加载Encoding模型"""
+        """Load encoding model"""
         from model.utils import load_model_encoder
         encoding_model = load_model_encoder(model_path, self.device)
         encoding_model.eval()
@@ -280,14 +280,14 @@ class BaseMethod:
     
     def _preprocess_image(self, image, device=None):
         """
-        预处理图像（PIL Image 或 路径）
+        Preprocess image (PIL Image or file path)
         
         Args:
-            image: PIL.Image 或 图像路径字符串
-            device: 目标设备，默认使用 self.device
+            image: PIL.Image or image file path string
+            device: Target device, defaults to self.device
             
         Returns:
-            torch.Tensor: 预处理后的图像张量 (1, 3, 224, 224)
+            torch.Tensor: Preprocessed image tensor (1, 3, 224, 224)
         """
         import torchvision.transforms as transforms
         
@@ -300,7 +300,7 @@ class BaseMethod:
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
         
-        # 如果是路径字符串，加载图像
+        # If it's a path string, load the image
         if isinstance(image, str):
             image = Image.open(image).convert('RGB')
         
@@ -308,14 +308,14 @@ class BaseMethod:
     
     def _generate_eeg_from_images(self, images, device=None):
         """
-        从PIL图像列表生成EEG特征
+        Generate EEG features from a list of PIL images
         
         Args:
-            images: List[PIL.Image] 或 List[str]（图像路径）
-            device: 目标设备，默认使用 self.device
+            images: List[PIL.Image] or List[str] (image paths)
+            device: Target device, defaults to self.device
             
         Returns:
-            List[np.ndarray]: 生成的EEG特征列表
+            List[np.ndarray]: List of generated EEG features
         """
         from model.utils import generate_eeg
         
@@ -331,38 +331,38 @@ class BaseMethod:
             synthetic_eeg = generate_eeg(self.encoding_model, img_tensor, device)
             synthetic_eegs.append(synthetic_eeg)
             
-            # 🔥 立即释放图像tensor
+            # Immediately release image tensor
             del img_tensor
         
         return synthetic_eegs
     
     def _compute_eeg_similarity_reward(self, eeg, target_feature, subject='sub-01'):
         """
-        计算EEG特征与目标特征的相似度reward
+        Compute similarity reward between EEG features and target features
         
         Args:
-            eeg: np.ndarray or torch.Tensor, EEG特征 (17, 250) 或 (1, 17, 250)
-            target_feature: torch.Tensor, 目标EEG特征
-            subject: str, 受试者ID
+            eeg: np.ndarray or torch.Tensor, EEG features (17, 250) or (1, 17, 250)
+            target_feature: torch.Tensor, target EEG feature
+            subject: str, subject ID
             
         Returns:
-            float: 归一化的相似度得分 [0, 1]
+            float: Normalized similarity score [0, 1]
         """
         from model.ATMS_retrieval import get_eeg_features
         
         if self.eeg_model is None:
             raise ValueError("eeg_model not initialized. Please set self.eeg_model in subclass.")
         
-        # 确保eeg是torch.Tensor并添加batch维度
-        # generate_eeg返回 (17, 250)，需要变成 (1, 17, 250)
+        # Ensure eeg is a torch.Tensor and add batch dimension
+        # generate_eeg returns (17, 250), needs to become (1, 17, 250)
         if not isinstance(eeg, torch.Tensor):
             eeg = torch.tensor(eeg)
         
-        # 如果没有batch维度（dim < 3），添加batch维度
+        # If no batch dimension (dim < 3), add batch dimension
         if eeg.dim() < 3:
             eeg = eeg.unsqueeze(0)
         
-        # 获取EEG特征
+        # Get EEG features
         eeg_feature = get_eeg_features(
             self.eeg_model, 
             eeg, 
@@ -370,7 +370,7 @@ class BaseMethod:
             subject
         )
         
-        # 计算余弦相似度并归一化到 [0, 1]
+        # Compute cosine similarity and normalize to [0, 1]
         similarity = torch.nn.functional.cosine_similarity(
             eeg_feature.to(self.device), 
             target_feature.to(self.device)
@@ -381,7 +381,7 @@ class BaseMethod:
 
 
 class PseudoModelWrapper(BaseMethod):
-    """包装现有的Pseudo Model方法"""
+    """Wrapper for the existing Pseudo Model method"""
     
     def __init__(self, config, device="cuda", shared_models=None):
         super().__init__(config, device)
@@ -389,7 +389,7 @@ class PseudoModelWrapper(BaseMethod):
         
         print(f"Initializing {self.name}...")
         
-        # 检查是否使用共享模型
+        # Check whether to use shared models
         if shared_models is not None:
             print("  Using shared models...")
             self.eeg_model = shared_models.get('eeg_model')
@@ -397,20 +397,20 @@ class PseudoModelWrapper(BaseMethod):
             self.vlmodel = shared_models.get('vlmodel')
             self.preprocess_train = shared_models.get('preprocess_train')
         else:
-            # 独立模式：加载自己的模型
+            # Standalone mode: load own models
             print("  Loading independent models...")
             from exp_batch_offline_generation import vlmodel, preprocess_train
             self.vlmodel = vlmodel
             self.preprocess_train = preprocess_train
         
-        # 使用基类方法加载模型
+        # Load models using base class methods
         print("  Loading EEG model...")
         self.eeg_model = self._load_eeg_model(config['eeg_model_path'])
         
         print("  Loading encoding model...")
         self.encoding_model = self._load_encoding_model(config['encoding_model_path'])
         
-        # 导入全局的Generator和pipe（这些不占大量显存）
+        # Import global Generator and pipe (these don't consume much GPU memory)
         from exp_batch_offline_generation import HeuristicGenerator, pipe
         self.generator = HeuristicGenerator(pipe, self.vlmodel, self.preprocess_train, device=device)
         self.pipe = pipe
@@ -418,7 +418,7 @@ class PseudoModelWrapper(BaseMethod):
         self.subject = config.get('subject', 'sub-01')
         
     def _get_image_pool(self, image_set_path):
-        """获取候选图片池"""
+        """Get candidate image pool"""
         test_images_path = []
         for root, dirs, files in os.walk(image_set_path):
             for file in sorted(files):
@@ -427,33 +427,33 @@ class PseudoModelWrapper(BaseMethod):
         return test_images_path
     
     def _generate_eeg_from_image_paths(self, test_image_list, device):
-        """从图像路径生成EEG（使用基类方法）"""
-        # 使用基类的 _generate_eeg_from_images 方法，它支持图像路径
+        """Generate EEG from image paths (using base class method)"""
+        # Use the base class _generate_eeg_from_images method, which supports image paths
         synthetic_eegs = self._generate_eeg_from_images(test_image_list, device)
         return np.asarray(synthetic_eegs)
     
     def optimize(self, target_eeg_feature, target_idx, budget=50):
-        """运行Pseudo Model优化"""
+        """Run Pseudo Model optimization"""
         start_time = time.time()
         
-        # 1. 获取图像池并采样
+        # 1. Get image pool and sample
         image_pool = self._get_image_pool(self.config['image_dir'])
         
-        # 🔥 排除 target 图像（避免数据泄露）
+        # Exclude target image (to prevent data leakage)
         if target_idx < len(image_pool):
             target_image_path = image_pool[target_idx]
             image_pool = [p for p in image_pool if p != target_image_path]
             print(f"  [PseudoModel] Excluded target image: {os.path.basename(target_image_path)}")
         
-        # 确定实际采样数量（不能超过排除target后的池大小）
+        # Determine actual sampling count (cannot exceed pool size after excluding target)
         actual_budget = min(budget, len(image_pool))
         print(f"  [PseudoModel] Sampling {actual_budget} images from pool of {len(image_pool)} (budget={budget})")
         sampled_paths = np.random.choice(image_pool, size=actual_budget, replace=False)
         
-        # 2. 计算CLIP embeddings（分批处理以减少显存峰值）
+        # 2. Compute CLIP embeddings (batch processing to reduce peak GPU memory)
         sampled_images = [Image.open(p).convert("RGB") for p in sampled_paths]
         
-        batch_size_clip = 16  # 一次处理16张图像
+        batch_size_clip = 16  # Process 16 images at a time
         offline_embeds_list = []
         
         with torch.no_grad():
@@ -461,13 +461,13 @@ class PseudoModelWrapper(BaseMethod):
                 batch_images = sampled_images[i:i+batch_size_clip]
                 tensor_batch = torch.stack([self.preprocess_train(img) for img in batch_images]).to(self.device)
                 batch_embeds = self.vlmodel.encode_image(tensor_batch)
-                offline_embeds_list.append(batch_embeds.cpu())  # 立即转到CPU
+                offline_embeds_list.append(batch_embeds.cpu())  # Immediately move to CPU
                 del tensor_batch, batch_embeds
         
         offline_embeds = torch.cat(offline_embeds_list, dim=0).to(self.device)
         del offline_embeds_list
         
-        # 3. 计算rewards（使用基类方法）
+        # 3. Compute rewards (using base class methods)
         synthetic_eegs = self._generate_eeg_from_image_paths(
             sampled_paths, self.device
         )
@@ -479,14 +479,14 @@ class PseudoModelWrapper(BaseMethod):
             )
             offline_rewards.append(r)
         
-        # 🔥 立即释放EEG特征（已经计算完rewards）
+        # Immediately release EEG features (rewards already computed)
         del synthetic_eegs
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         
         offline_rewards_tensor = torch.tensor(offline_rewards).to(self.device)
         
-        # 4. 添加数据到Pseudo Model
+        # 4. Add data to Pseudo Model
         from model.pseudo_target_model import PseudoTargetModel
         self.generator.pseudo_target_model = PseudoTargetModel(
             dimension=1024, noise_level=1e-4
@@ -497,11 +497,11 @@ class PseudoModelWrapper(BaseMethod):
             (-offline_rewards_tensor * self.generator.reward_scaling_factor).to(self.device)
         )
         
-        # 5. 评估阶段：生成5张图像并求平均分数
+        # 5. Evaluation phase: generate 5 images and compute average score
         num_eval_samples = 5
         print(f"  [PseudoModel] Generating {num_eval_samples} evaluation images...")
         
-        # 🔥 先释放不再需要的大张量，为评估腾出空间
+        # Release large tensors no longer needed, freeing space for evaluation
         del sampled_images
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -511,7 +511,7 @@ class PseudoModelWrapper(BaseMethod):
         final_rewards = []
         
         for eval_idx in range(num_eval_samples):
-            # 每次生成一张图像（因为 generator.generate_batch_size=1）
+            # Generate one image at a time (since generator.generate_batch_size=1)
             eval_images = self.generator.generate(
                 data_x=offline_embeds,
                 data_y=offline_rewards_tensor,
@@ -520,7 +520,7 @@ class PseudoModelWrapper(BaseMethod):
                 save_path=None
             )
             
-            # 计算该图像的 reward
+            # Compute the reward for this image
             eval_eegs = self._generate_eeg_from_images(eval_images, self.device)
             eval_reward = self._compute_eeg_similarity_reward(
                 eval_eegs[0], target_eeg_feature, self.subject
@@ -529,23 +529,23 @@ class PseudoModelWrapper(BaseMethod):
             final_images.extend(eval_images)
             final_rewards.append(eval_reward)
             
-            # 🔥 立即释放中间变量
+            # Immediately release intermediate variables
             del eval_eegs
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         
         elapsed_time = time.time() - start_time
         
-        # 6. 计算平均分数作为最终结果
+        # 6. Compute average score as the final result
         avg_reward = np.mean(final_rewards)
         print(f"  [PseudoModel] Evaluation complete: avg reward = {avg_reward:.4f} (std = {np.std(final_rewards):.4f})")
         print(f"  [PseudoModel] Individual rewards: {[f'{r:.4f}' for r in final_rewards]}")
         
         result = {
             'images': final_images,
-            'best_image': final_images[0],  # 保留第一张作为代表图像
+            'best_image': final_images[0],  # Keep the first image as representative
             'rewards': final_rewards,
-            'best_reward': avg_reward,  # 使用平均值
+            'best_reward': avg_reward,  # Use average value
             'time': elapsed_time,
             'n_samples': budget,
             'metadata': {
@@ -556,10 +556,10 @@ class PseudoModelWrapper(BaseMethod):
             }
         }
         
-        # 清理中间变量释放显存
+        # Clean up intermediate variables to release GPU memory
         del offline_embeds, offline_rewards_tensor
         
-        # 🔥 清理Pseudo Target Model
+        # Clean up Pseudo Target Model
         if hasattr(self.generator, 'pseudo_target_model') and self.generator.pseudo_target_model is not None:
             del self.generator.pseudo_target_model
             self.generator.pseudo_target_model = None
@@ -571,20 +571,20 @@ class PseudoModelWrapper(BaseMethod):
         return result
     
     def reset(self):
-        """重置Generator状态，清理GPU缓存"""
-        # 🔥 清理Pseudo Target Model
+        """Reset Generator state and clean up GPU cache"""
+        # Clean up Pseudo Target Model
         if hasattr(self.generator, 'pseudo_target_model') and self.generator.pseudo_target_model is not None:
             del self.generator.pseudo_target_model
             self.generator.pseudo_target_model = None
         
-        # 重置Pseudo Target Model会在下次optimize时自动创建新的
+        # PseudoTargetModel will be automatically recreated on the next optimize call
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
 
 class HeuristicClosedLoopWrapper(BaseMethod):
-    """Heuristic Closed-Loop Pseudo Model方法（迭代融合+贪婪采样）"""
+    """Heuristic Closed-Loop Pseudo Model method (iterative fusion + greedy sampling)"""
     
     def __init__(self, config, device="cuda", shared_models=None):
         super().__init__(config, device)
@@ -592,7 +592,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
         
         print(f"Initializing {self.name}...")
         
-        # 检查是否使用共享模型
+        # Check whether to use shared models
         if shared_models is not None:
             print("  Using shared models...")
             self.eeg_model = shared_models.get('eeg_model')
@@ -600,55 +600,55 @@ class HeuristicClosedLoopWrapper(BaseMethod):
             self.vlmodel = shared_models.get('vlmodel')
             self.preprocess_train = shared_models.get('preprocess_train')
         else:
-            # 独立模式：加载自己的模型
+            # Standalone mode: load own models
             print("  Loading independent models...")
             from exp_batch_offline_generation import vlmodel, preprocess_train
             self.vlmodel = vlmodel
             self.preprocess_train = preprocess_train
         
-        # 使用基类方法加载模型
+        # Load models using base class methods
         print("  Loading EEG model...")
         self.eeg_model = self._load_eeg_model(config['eeg_model_path'])
         
         print("  Loading encoding model...")
         self.encoding_model = self._load_encoding_model(config['encoding_model_path'])
         
-        # 导入 pipe
+        # Import pipe
         from exp_batch_offline_generation import pipe
         
-        # 使用共享的pipe或独立加载
+        # Use shared pipe or load independently
         if shared_models is not None and shared_models.get('sdxl_pipe') is not None:
             self.pipe = shared_models.get('sdxl_pipe')
         else:
             self.pipe = pipe
         
-        # 🔥 初始化 HeuristicGenerator（包含 PseudoTargetModel）
-        # 使用当前文件中定义的 HeuristicGenerator 类
-        # 不自动加载IP adapter（因为已经通过shared_models加载）
+        # Initialize HeuristicGenerator (contains PseudoTargetModel)
+        # Uses the HeuristicGenerator class defined in this file
+        # Don't auto-load IP adapter (already loaded via shared_models)
         self.generator = HeuristicGenerator(
             self.pipe, 
             self.vlmodel, 
             self.preprocess_train, 
             device=device,
             seed=42,
-            load_ip_adapter=False,  # 不重复加载
-            min_data_threshold=5  # 🔥 修改为5，与initial_sample_size保持一致
+            load_ip_adapter=False,  # Don't load again
+            min_data_threshold=5  # Set to 5 to match initial_sample_size
         )
         
         self.subject = config.get('subject', 'sub-01')
         
-        # Closed-loop 特定参数
-        # 🔥 关键改进：实际循环次数由budget自动决定，num_loops_max仅作为可选的硬性上限
-        # 这样可以在不超过budget的前提下，自动运行尽可能多的优化迭代轮数
-        self.num_loops_max = config.get('num_loops_closedloop', 999)  # 最大循环次数上限（默认999，实际由budget决定）
-        self.num_fusions_per_round = config.get('num_fusions_per_round', 2)  # 每轮融合次数
-        self.top_k_greedy = config.get('top_k_greedy', 20)  # 贪婪采样的top-k
-        self.initial_sample_size = config.get('initial_sample_size_closedloop', 5)  # 初始采样数量
+        # Closed-loop specific parameters
+        # Key improvement: actual loop count is auto-determined by budget; num_loops_max is only an optional hard cap
+        # This allows running as many optimization iterations as possible without exceeding the budget
+        self.num_loops_max = config.get('num_loops_closedloop', 999)  # Max loop count cap (default 999, actual determined by budget)
+        self.num_fusions_per_round = config.get('num_fusions_per_round', 2)  # Fusions per round
+        self.top_k_greedy = config.get('top_k_greedy', 20)  # Top-k for greedy sampling
+        self.initial_sample_size = config.get('initial_sample_size_closedloop', 5)  # Initial sample count
         
         print(f"  Closed-loop params: num_loops_max={self.num_loops_max} (auto from budget), fusions_per_round={self.num_fusions_per_round}")
     
     def _get_image_pool(self, image_set_path):
-        """获取候选图片池"""
+        """Get candidate image pool"""
         test_images_path = []
         for root, dirs, files in os.walk(image_set_path):
             for file in sorted(files):
@@ -658,22 +658,22 @@ class HeuristicClosedLoopWrapper(BaseMethod):
     
     def _fusion_image_generation(self, fit_images, fit_rewards):
         """
-        融合生成图像（严格按照原始实现）
-        调用 Generator.generate()，包含15步GP优化
+        Fusion-based image generation (strictly following original implementation)
+        Calls Generator.generate(), which includes 15-step GP optimization
         """
         import random
         
-        # 提取fit_images的CLIP embeddings
+        # Extract CLIP embeddings from fit_images
         tensor_fit_images = [self.preprocess_train(img) for img in fit_images]
         with torch.no_grad():
             img_embeds = self.vlmodel.encode_image(torch.stack(tensor_fit_images).to(self.device))
         
-        # 随机选择两个图像进行融合
+        # Randomly select two images for fusion
         idx1, idx2 = random.sample(range(len(img_embeds)), 2)
         embed1 = img_embeds[idx1].unsqueeze(0)
         embed2 = img_embeds[idx2].unsqueeze(0)
         
-        # 部分交换（类似基因交叉）
+        # Partial swap (similar to genetic crossover)
         scale = 512
         embed_len = embed1.size(1)
         start_idx = random.randint(0, embed_len - scale - 1)
@@ -683,11 +683,11 @@ class HeuristicClosedLoopWrapper(BaseMethod):
         embed1[:, start_idx:end_idx] = embed2[:, start_idx:end_idx]
         embed2[:, start_idx:end_idx] = temp
         
-        # 🔥 使用 Generator.generate() 生成图像（包含15步优化）
+        # Use Generator.generate() to produce images (includes 15-step optimization)
         generated_images = []
         
         with torch.no_grad():
-            # 生成第一张图像（从 embed1 开始优化）
+            # Generate first image (optimizing from embed1)
             images1 = self.generator.generate(
                 img_embeds.to(self.device),
                 torch.tensor(fit_rewards).to(self.device),
@@ -698,7 +698,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
             )
             generated_images.extend(images1)
             
-            # 生成第二张图像（从 embed2 开始优化）
+            # Generate second image (optimizing from embed2)
             images2 = self.generator.generate(
                 img_embeds.to(self.device),
                 torch.tensor(fit_rewards).to(self.device),
@@ -709,12 +709,12 @@ class HeuristicClosedLoopWrapper(BaseMethod):
             )
             generated_images.extend(images2)
         
-        # 返回生成的图像和源图像索引
+        # Return generated images and source image indices
         return generated_images, (idx1, idx2), fit_images
     
     def _greedy_sampling(self, target_clip_embed, image_pool, processed_paths, test_set_img_embeds, num_samples):
-        """基于target的贪婪采样"""
-        # 获取可用图像的索引
+        """Target-based greedy sampling"""
+        # Get indices of available images
         available_indices = []
         for i, path in enumerate(image_pool):
             if path not in processed_paths:
@@ -723,10 +723,10 @@ class HeuristicClosedLoopWrapper(BaseMethod):
         if len(available_indices) == 0:
             return []
         
-        # 基于 target_clip_embed 计算相似度
+        # Compute similarity based on target_clip_embed
         available_features = test_set_img_embeds[available_indices]
         
-        # 计算余弦相似度
+        # Compute cosine similarity
         target_norm = torch.nn.functional.normalize(target_clip_embed.float(), p=2, dim=1)
         available_norm = torch.nn.functional.normalize(available_features.float(), p=2, dim=1)
         cosine_similarities = torch.mm(available_norm, target_norm.t()).squeeze(1)
@@ -734,12 +734,12 @@ class HeuristicClosedLoopWrapper(BaseMethod):
         
         sorted_available_indices = np.argsort(cosine_similarities.cpu())
         
-        # 从 top-K 中随机采样
+        # Randomly sample from top-K
         top_indices = sorted_available_indices[-min(self.top_k_greedy, len(sorted_available_indices)):]
         num_to_sample = min(num_samples, len(top_indices))
         selected_indices = np.random.choice(top_indices, size=num_to_sample, replace=False)
         
-        # 加载选中的图像
+        # Load selected images
         greedy_images = []
         sample_image_paths = []
         for selected_idx in selected_indices:
@@ -752,26 +752,26 @@ class HeuristicClosedLoopWrapper(BaseMethod):
         return greedy_images
     
     def optimize(self, target_eeg_feature, target_idx, budget=50):
-        """运行Heuristic Closed-Loop优化"""
+        """Run Heuristic Closed-Loop optimization"""
         from scipy.special import softmax
         from model.pseudo_target_model import PseudoTargetModel
         
         start_time = time.time()
         
-        # 🔥 重新初始化 Generator 的 PseudoTargetModel（每次优化都创建新的）
+        # Re-initialize Generator's PseudoTargetModel (create a new one for each optimization)
         self.generator.pseudo_target_model = PseudoTargetModel(
             dimension=1024, 
             noise_level=1e-4
         ).to(self.device)
         
-        # 🔥 根据 budget 自动计算最优循环次数
-        IMAGES_PER_LOOP_INITIAL = self.initial_sample_size  # 第1轮：初始采样
-        IMAGES_PER_LOOP_FUSION = self.num_fusions_per_round * 4 + self.num_fusions_per_round * 2  # 每轮后续：融合生成+源图+贪婪采样
+        # Automatically compute optimal loop count from budget
+        IMAGES_PER_LOOP_INITIAL = self.initial_sample_size  # Round 1: initial sampling
+        IMAGES_PER_LOOP_FUSION = self.num_fusions_per_round * 4 + self.num_fusions_per_round * 2  # Subsequent rounds: fusion generation + source images + greedy sampling
         
         remaining_budget = budget - IMAGES_PER_LOOP_INITIAL
         num_loops_from_budget = 1 + max(0, remaining_budget // IMAGES_PER_LOOP_FUSION)
         
-        # 🔥 优先使用budget计算的轮数，num_loops_max仅作为硬性上限
+        # Prefer budget-based loop count; num_loops_max is only a hard cap
         actual_num_loops = min(self.num_loops_max, num_loops_from_budget)
         estimated_images = IMAGES_PER_LOOP_INITIAL + (actual_num_loops - 1) * IMAGES_PER_LOOP_FUSION
         
@@ -780,16 +780,16 @@ class HeuristicClosedLoopWrapper(BaseMethod):
         print(f"  [{self.name}] Actual loops={actual_num_loops}, Estimated images={estimated_images} (utilization: {estimated_images/budget*100:.1f}%)")
         print(f"  [{self.name}] Config: fusions/round={self.num_fusions_per_round}, initial_samples={self.initial_sample_size}")
         
-        # 1. 获取图像池
+        # 1. Get image pool
         image_pool = self._get_image_pool(self.config['image_dir'])
         
-        # 排除 target 图像
+        # Exclude target image
         if target_idx < len(image_pool):
             target_image_path = image_pool[target_idx]
             image_pool = [p for p in image_pool if p != target_image_path]
             print(f"  [{self.name}] Excluded target image: {os.path.basename(target_image_path)}")
         
-        # 2. 预先计算所有图像的CLIP embeddings（避免重复计算）
+        # 2. Pre-compute CLIP embeddings for all images (to avoid redundant computation)
         print(f"  [{self.name}] Pre-computing CLIP embeddings for {len(image_pool)} images...")
         all_images_pil = [Image.open(p).convert("RGB") for p in image_pool]
         
@@ -806,7 +806,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
         test_set_img_embeds = torch.cat(test_set_img_embeds_list, dim=0).to(self.device)
         del test_set_img_embeds_list, all_images_pil
         
-        # 3. 获取target的CLIP embedding
+        # 3. Get target's CLIP embedding
         target_image_path = image_pool[0] if target_idx >= len(image_pool) else image_pool[target_idx]
         target_image_pil = Image.open(target_image_path).convert("RGB")
         with torch.no_grad():
@@ -814,7 +814,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                 self.preprocess_train(target_image_pil).unsqueeze(0).to(self.device)
             )
         
-        # 4. 闭环迭代
+        # 4. Closed-loop iteration
         processed_paths = set()
         fit_images = []
         fit_eegs = []
@@ -822,14 +822,14 @@ class HeuristicClosedLoopWrapper(BaseMethod):
         
         all_loop_rewards = []
         all_loop_images = []
-        total_images_evaluated = 0  # 🔥 追踪实际评估的图像总数
+        total_images_evaluated = 0  # Track total number of images actually evaluated
         
-        # 🔥 保存最后一轮的所有候选（用于评估）
+        # Save all candidates from the final round (for evaluation)
         final_loop_images = []
         final_loop_eegs = []
         final_loop_rewards = []
         
-        # 🔥 使用根据 budget 计算的 actual_num_loops
+        # Use actual_num_loops computed from budget
         for t in range(actual_num_loops):
             print(f"\n  [{self.name}] Loop {t+1}/{actual_num_loops}")
             
@@ -839,7 +839,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
             loop_loss_ten = []
             
             if t == 0:
-                # 初始轮：从图像池随机采样
+                # Initial round: random sampling from image pool
                 print(f"    Initial sampling: {self.initial_sample_size} images")
                 available_paths = [path for path in image_pool if path not in processed_paths]
                 sample_image_paths = np.random.choice(
@@ -851,7 +851,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                 chosen_images = [Image.open(p).convert("RGB") for p in sample_image_paths]
                 processed_paths.update(sample_image_paths)
                 
-                # 计算rewards
+                # Compute rewards
                 synthetic_eegs = self._generate_eeg_from_images(chosen_images, self.device)
                 chosen_rewards = [
                     self._compute_eeg_similarity_reward(eeg, target_eeg_feature, self.subject)
@@ -865,10 +865,10 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                 loop_reward_ten.extend(chosen_rewards)
                 loop_loss_ten.extend(chosen_losses)
                 
-                # 🔥 更新图像评估计数
+                # Update image evaluation count
                 total_images_evaluated += len(chosen_images)
                 
-                # 添加到PseudoTargetModel
+                # Add to PseudoTargetModel
                 tensor_loop_sample = [self.preprocess_train(img) for img in loop_sample_ten]
                 with torch.no_grad():
                     tensor_loop_sample_embeds = self.vlmodel.encode_image(
@@ -883,11 +883,11 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                 torch.cuda.empty_cache()
             
             else:
-                # 后续轮：融合生成 + 贪婪采样
+                # Subsequent rounds: fusion generation + greedy sampling
                 all_generated_images = []
                 all_fusion_source_images = []
                 
-                # 多次融合
+                # Multiple fusions
                 for fusion_idx in range(self.num_fusions_per_round):
                     print(f"      Fusion {fusion_idx+1}/{self.num_fusions_per_round}")
                     
@@ -898,7 +898,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                     loop_eeg_ten.extend(synthetic_eegs)
                     all_generated_images.extend(generated_images)
                     
-                    # 计算融合生成图像的rewards
+                    # Compute rewards for fusion-generated images
                     for eeg in synthetic_eegs:
                         r = self._compute_eeg_similarity_reward(eeg, target_eeg_feature, self.subject)
                         loop_reward_ten.append(r)
@@ -907,7 +907,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                     del synthetic_eegs
                     torch.cuda.empty_cache()
                     
-                    # 添加融合源图像
+                    # Add fusion source images
                     fusion_source_images = [fit_imgs[idx1], fit_imgs[idx2]]
                     fusion_source_eegs = self._generate_eeg_from_images(fusion_source_images, self.device)
                     
@@ -925,10 +925,10 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                 
                 print(f"      Fusion complete: {len(all_generated_images)} generated, {len(all_fusion_source_images)} sources")
                 
-                # 🔥 更新图像评估计数（融合生成的图像 + 源图像）
+                # Update image evaluation count (fusion-generated images + source images)
                 total_images_evaluated += len(all_generated_images) + len(all_fusion_source_images)
                 
-                # 贪婪采样
+                # Greedy sampling
                 num_greedy_samples = len(all_generated_images)
                 greedy_images = self._greedy_sampling(
                     target_clip_embed, 
@@ -948,7 +948,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                         loop_reward_ten.append(r)
                         loop_loss_ten.append(0)
                     
-                    # 🔥 更新图像评估计数（贪婪采样的图像）
+                    # Update image evaluation count (greedy-sampled images)
                     total_images_evaluated += len(greedy_images)
                     
                     del synthetic_eegs
@@ -956,10 +956,10 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                     
                     print(f"      Greedy sampling: {len(greedy_images)} images from top-{self.top_k_greedy}")
                 
-                # 🔥 选择top-5保留到下一轮（与其他方法保持一致）
+                # Select top-5 to carry over to next round (consistent with other methods)
                 loop_probabilities = softmax(loop_reward_ten)
                 
-                # 概率采样top-5
+                # Probabilistic sampling for top-5
                 chosen_indices = np.random.choice(
                     len(loop_probabilities), 
                     size=min(5, len(loop_probabilities)), 
@@ -972,7 +972,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                 chosen_images = [loop_sample_ten[idx] for idx in chosen_indices]
                 chosen_eegs = [loop_eeg_ten[idx] for idx in chosen_indices]
                 
-                # 按reward排序
+                # Sort by reward
                 combined = list(zip(chosen_rewards, chosen_losses, chosen_images, chosen_eegs))
                 combined.sort(reverse=True, key=lambda x: x[0])
                 chosen_rewards, chosen_losses, chosen_images, chosen_eegs = zip(*combined)
@@ -981,7 +981,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                 chosen_images = list(chosen_images)
                 chosen_eegs = list(chosen_eegs)
                 
-                # 添加到PseudoTargetModel
+                # Add to PseudoTargetModel
                 tensor_loop_sample = [self.preprocess_train(img) for img in loop_sample_ten]
                 with torch.no_grad():
                     tensor_loop_sample_embeds = self.vlmodel.encode_image(
@@ -995,19 +995,19 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                 del tensor_loop_sample, tensor_loop_sample_embeds
                 torch.cuda.empty_cache()
             
-            # 更新fit数据
+            # Update fit data
             fit_images = chosen_images
             fit_eegs = chosen_eegs
             fit_rewards = chosen_rewards
             fit_losses = chosen_losses
             
-            # 记录本轮数据
+            # Record data for this round
             all_loop_rewards.append(np.mean(loop_reward_ten))
-            all_loop_images.extend(loop_sample_ten[:4])  # 保留前4张作为代表
+            all_loop_images.extend(loop_sample_ten[:4])  # Keep first 4 as representatives
             
             print(f"      Loop {t+1} complete: mean_reward={np.mean(loop_reward_ten):.4f}, best_reward={max(loop_reward_ten):.4f}")
             
-            # 🔥 如果是最后一轮，保存所有候选图像用于评估（恢复原始评估方式）
+            # If this is the final round, save all candidate images for evaluation (original evaluation approach)
             if t == actual_num_loops - 1:
                 print(f"  [{self.name}] Saving final round candidates for evaluation...")
                 final_loop_images = loop_sample_ten.copy()
@@ -1015,24 +1015,24 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                 final_loop_rewards = loop_reward_ten.copy()
                 print(f"  [{self.name}] Final round: {len(final_loop_images)} candidates saved")
         
-        # 记录优化时间（不包括评估时间）
+        # Record optimization time (excluding evaluation time)
         optimization_time = time.time() - start_time
         
         print(f"  [{self.name}] Optimization complete in {optimization_time:.2f}s")
         print(f"  [{self.name}] Training best reward: {np.mean(fit_rewards):.4f}")
         print(f"  [{self.name}] Actual image evaluations during training: {total_images_evaluated} (budget: {budget}, estimated: {estimated_images})")
         
-        # 🔥 5. 评估阶段：从最后一轮候选中选择Top-5（恢复原始评估方式）
-        # 这是HeuristicClosedLoop的正确评估方式：它通过迭代产生候选，然后选择最优
+        # 5. Evaluation phase: select Top-5 from the final round's candidates (original evaluation approach)
+        # This is the correct evaluation method for HeuristicClosedLoop: candidates are produced iteratively, then the best are selected
         num_eval_samples = 5
         
         if len(final_loop_images) > 0:
             print(f"  [{self.name}] Selecting Top-{num_eval_samples} from final round's {len(final_loop_images)} candidates...")
             print(f"  [{self.name}] Final round rewards: {[f'{r:.4f}' for r in final_loop_rewards]}")
             
-            # 从最后一轮的所有候选中选择Top-5（基于EEG similarity reward）
-            sorted_indices = np.argsort(final_loop_rewards)[-num_eval_samples:]  # 选择reward最高的5个
-            sorted_indices = sorted_indices[::-1]  # 从高到低排序
+            # Select Top-5 from the final round's candidates (based on EEG similarity reward)
+            sorted_indices = np.argsort(final_loop_rewards)[-num_eval_samples:]  # Select 5 with highest reward
+            sorted_indices = sorted_indices[::-1]  # Sort from high to low
             
             eval_images = [final_loop_images[i] for i in sorted_indices]
             eval_eegs = [final_loop_eegs[i] for i in sorted_indices]
@@ -1041,17 +1041,17 @@ class HeuristicClosedLoopWrapper(BaseMethod):
             print(f"  [{self.name}] Selected Top-{num_eval_samples} rewards: {[f'{r:.4f}' for r in eval_rewards]}")
             
         else:
-            # 如果没有保存最后一轮数据（例如提前停止），使用fit_images
+            # If no final round data was saved (e.g. early stop), use fit_images as fallback
             print(f"  [{self.name}] Warning: No final round candidates, using fit_images as fallback")
             eval_images = fit_images[:num_eval_samples]
             eval_eegs = fit_eegs[:num_eval_samples]
             eval_rewards = fit_rewards[:num_eval_samples]
         
-        # 计算评估结果
+        # Compute evaluation results
         final_eval_reward = np.mean(eval_rewards)
-        best_eval_image = eval_images[0]  # 已经按reward排序，第一张就是最佳
+        best_eval_image = eval_images[0]  # Already sorted by reward, first is best
         
-        # 总时间（优化时间，不需要额外评估时间）
+        # Total time (optimization time, no additional evaluation time needed)
         total_time = optimization_time
         
         print(f"  [{self.name}] Evaluation complete:")
@@ -1061,14 +1061,14 @@ class HeuristicClosedLoopWrapper(BaseMethod):
         print(f"  [{self.name}]   - Total time: {total_time:.2f}s")
         print(f"  [{self.name}]   - Evaluation method: Selection from final round candidates (original method)")
         
-        # 🔥 返回选出的Top-5图像（恢复原始评估方式）
+        # Return selected Top-5 images (original evaluation approach)
         result = {
-            'images': eval_images,  # 从最后一轮候选中选出的Top-5
+            'images': eval_images,  # Top-5 selected from final round candidates
             'best_image': best_eval_image,  # Top-1
-            'rewards': eval_rewards,  # 对应的rewards
-            'best_reward': final_eval_reward,  # Top-5的平均reward
-            'time': total_time,  # 总时间
-            'n_samples': total_images_evaluated,  # 训练期间评估的图像数
+            'rewards': eval_rewards,  # Corresponding rewards
+            'best_reward': final_eval_reward,  # Average reward of Top-5
+            'time': total_time,  # Total time
+            'n_samples': total_images_evaluated,  # Number of images evaluated during training
             'metadata': {
                 'num_loops': actual_num_loops,
                 'fusions_per_round': self.num_fusions_per_round,
@@ -1079,20 +1079,20 @@ class HeuristicClosedLoopWrapper(BaseMethod):
                 'from_pool_samples': len(processed_paths),
                 'training_best_reward': float(np.mean(fit_rewards)),
                 'optimization_time': optimization_time,
-                'evaluation_method': 'selection_from_candidates',  # 标记评估方式
+                'evaluation_method': 'selection_from_candidates',  # Indicates evaluation method
                 'num_final_candidates': len(final_loop_images),
                 'num_eval_samples': num_eval_samples
             }
         }
         
-        # 清理
+        # Clean up
         del test_set_img_embeds, target_clip_embed
         
-        # 清理最后一轮数据（已经使用完毕）
+        # Clean up final round data (already consumed)
         if len(final_loop_images) > 0:
             del final_loop_images, final_loop_eegs, final_loop_rewards
         
-        # 清理 PseudoTargetModel
+        # Clean up PseudoTargetModel
         if hasattr(self, 'generator') and self.generator is not None:
             if hasattr(self.generator, 'pseudo_target_model') and self.generator.pseudo_target_model is not None:
                 del self.generator.pseudo_target_model
@@ -1105,7 +1105,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
         return result
     
     def reset(self):
-        """重置状态，清理GPU缓存"""
+        """Reset state and clean up GPU cache"""
         if hasattr(self, 'generator') and self.generator is not None:
             if hasattr(self.generator, 'pseudo_target_model') and self.generator.pseudo_target_model is not None:
                 del self.generator.pseudo_target_model
@@ -1117,7 +1117,7 @@ class HeuristicClosedLoopWrapper(BaseMethod):
 
 
 class DDPOWrapper(BaseMethod):
-    """DDPO方法的包装器 - 基于d3po实现"""
+    """DDPO method wrapper - based on d3po implementation"""
     
     def __init__(self, config, device="cuda", shared_models=None):
         super().__init__(config, device)
@@ -1125,26 +1125,26 @@ class DDPOWrapper(BaseMethod):
         
         print(f"Initializing {self.name}...")
         
-        # 导入依赖
+        # Import dependencies
         from peft import LoraConfig
         from model.ATMS_retrieval import ATMS, get_eeg_features
         import sys
         sys.path.append('/home/ldy/Workspace/guide-stable-diffusion/related_works/d3po/d3po')
         
-        # 检查是否使用共享模型
+        # Check whether to use shared models
         if shared_models is not None:
             print("  Using shared models...")
-            # 使用共享的模型实例
+            # Use shared model instances
             self.eeg_model = shared_models.get('eeg_model')
             self.encoding_model = shared_models.get('encoding_model')
             
-            # 🔥 使用共享的SDXL pipeline（不创建新的！）
+            # Use the shared SDXL pipeline (don't create a new one!)
             self.pipe = shared_models.get('sdxl_pipe')
             if self.pipe is None:
                 raise ValueError("Shared SDXL pipeline not found!")
             print("  Using shared SDXL pipeline")
         else:
-            # 独立模式：创建自己的 pipeline 和模型
+            # Standalone mode: create own pipeline and models
             print("  Standalone mode: loading independently...")
             self.pipe = self._create_independent_pipeline(device)
             self.eeg_model = self._load_eeg_model(config['eeg_model_path'])
@@ -1152,7 +1152,7 @@ class DDPOWrapper(BaseMethod):
         
         self.subject = config.get('subject', 'sub-01')
         
-        # 训练参数
+        # Training parameters
         self.n_epochs = config.get('n_epochs', 5)
         self.batch_size = config.get('batch_size', 4)
         self.learning_rate = config.get('learning_rate', 3e-5)
@@ -1163,12 +1163,12 @@ class DDPOWrapper(BaseMethod):
         self.guidance_scale = 0.0
         self.eta = 0.0
         
-        # 冻结非训练组件
+        # Freeze non-trainable components
         self.pipe.vae.requires_grad_(False)
         self.pipe.text_encoder.requires_grad_(False)
         self.pipe.text_encoder_2.requires_grad_(False)
         
-        # 🔥 延迟配置LoRA：在optimize()时再添加，避免与其他方法冲突
+        # Deferred LoRA configuration: add at optimize() time to avoid conflicts with other methods
         print("  LoRA will be configured on first optimize() call")
         self.lora_config = LoraConfig(
             r=16,
@@ -1176,20 +1176,20 @@ class DDPOWrapper(BaseMethod):
             init_lora_weights="gaussian",
             target_modules=["to_k", "to_q", "to_v", "to_out.0"],
         )
-        self.optimizer = None  # 优化器也延迟创建
+        self.optimizer = None  # Optimizer is also deferred
         
         print(f"  DDPO initialized: {self.n_epochs} epochs, batch_size={self.batch_size}")
     
     def _create_independent_pipeline(self, device):
-        """创建独立的 SDXL pipeline（与其他方法使用相同的模型）"""
+        """Create an independent SDXL pipeline (using the same model as other methods)"""
         from diffusers import AutoencoderKL, DDIMScheduler, UNet2DConditionModel, StableDiffusionXLPipeline
         from safetensors.torch import load_file
         from huggingface_hub import hf_hub_download
         
-        # 使用与 Generator4Embeds 相同的模型配置
+        # Use the same model configuration as Generator4Embeds
         model_id = "stabilityai/stable-diffusion-xl-base-1.0"
         
-        # 加载 UNet（SDXL-Lightning 8步模型）
+        # Load UNet (SDXL-Lightning 8-step model)
         unet = UNet2DConditionModel.from_pretrained(
             model_id, 
             subfolder="unet", 
@@ -1202,20 +1202,20 @@ class DDPOWrapper(BaseMethod):
             "sdxl_lightning_8step_unet.safetensors"
         )))
         
-        # 加载 VAE
+        # Load VAE
         vae = AutoencoderKL.from_pretrained(
             "madebyollin/sdxl-vae-fp16-fix", 
             torch_dtype=torch.bfloat16
         )
         
-        # 加载 Scheduler
+        # Load Scheduler
         scheduler = DDIMScheduler.from_pretrained(
             model_id, 
             subfolder="scheduler",
             timestep_spacing="trailing"
         )
         
-        # 创建 pipeline（不使用 ExtendedStableDiffusionXLPipeline，避免 IP-Adapter 相关代码）
+        # Create pipeline (not using ExtendedStableDiffusionXLPipeline to avoid IP-Adapter related code)
         pipe = StableDiffusionXLPipeline.from_pretrained(
             model_id, 
             unet=unet, 
@@ -1232,25 +1232,25 @@ class DDPOWrapper(BaseMethod):
         return pipe
     
     def optimize(self, target_eeg_feature, target_idx, budget=50):
-        """运行DDPO优化（基于d3po的实现，使用gradient accumulation避免显存暴涨）"""
+        """Run DDPO optimization (based on d3po, using gradient accumulation to avoid GPU memory spikes)"""
         from d3po_pytorch.diffusers_patch.pipeline_with_logprob_sdxl import pipeline_with_logprob
         from d3po_pytorch.diffusers_patch.ddim_with_logprob import ddim_step_with_logprob
         
-        # 🔥 Step 1: 清理所有已有的LoRA adapters（避免与其他方法冲突）
+        # Step 1: Remove all existing LoRA adapters (avoid conflicts with other methods)
         print(f"  [{self.name}] Setting up LoRA adapter...")
         if hasattr(self.pipe.unet, 'peft_config') and len(self.pipe.unet.peft_config) > 0:
             print(f"    Removing {len(self.pipe.unet.peft_config)} existing adapter(s)")
             self.pipe.unet.delete_adapters(list(self.pipe.unet.peft_config.keys()))
         
-        # 🔥 Step 2: 添加本方法的LoRA adapter
+        # Step 2: Add this method's LoRA adapter
         self.pipe.unet.add_adapter(self.lora_config)
         
-        # 🔥 Step 3: 设置LoRA参数为float32
+        # Step 3: Set LoRA parameters to float32
         for param in self.pipe.unet.parameters():
             if param.requires_grad:
                 param.data = param.to(torch.float32)
         
-        # 🔥 Step 4: 创建优化器
+        # Step 4: Create optimizer
         trainable_params = filter(lambda p: p.requires_grad, self.pipe.unet.parameters())
         self.optimizer = torch.optim.AdamW(
             trainable_params,
@@ -1268,22 +1268,22 @@ class DDPOWrapper(BaseMethod):
         best_image = None
         total_samples_count = 0
         
-        # 在训练前清理 GPU 内存
+        # Clear GPU memory before training
         torch.cuda.empty_cache()
         
         print(f"  Training with gradient accumulation: {num_batches_per_epoch} batches per epoch")
         
         for epoch in range(self.n_epochs):
-            #################### SAMPLING + TRAINING (逐个batch处理，避免累积) ####################
-            self.pipe.unet.train()  # 直接进入训练模式
+            #################### SAMPLING + TRAINING (process one batch at a time, no accumulation) ####################
+            self.pipe.unet.train()  # Enter training mode directly
             
-            # 🔥 关键改变：逐个batch采样和训练，不累积所有samples
+            # Key change: sample and train one batch at a time, don't accumulate all samples
             for batch_idx in range(num_batches_per_epoch):
-                ########## Step 1: 采样单个batch ##########
+                ########## Step 1: Sample a single batch ##########
                 self.pipe.unet.eval()
                 prompts = [""] * self.batch_size
                 
-                # 创建随机生成器
+                # Create random generator
                 generator = torch.Generator(device=self.device)
                 generator.manual_seed(torch.seed())
                 
@@ -1296,46 +1296,46 @@ class DDPOWrapper(BaseMethod):
                         generator=generator,
                     )
                 
-                # 转换为PIL并立即转移到CPU
+                # Convert to PIL and immediately move to CPU
                 pil_images = [Image.fromarray((img.float().cpu().numpy().transpose(1,2,0)*255).astype(np.uint8)) 
                               for img in images]
                 
-                # 将所有GPU tensor转到CPU
+                # Move all GPU tensors to CPU
                 latents_cpu = [lat.cpu() for lat in latents]
                 log_probs_cpu = [lp.cpu() for lp in log_probs]
                 
-                # 🔥 立即删除GPU上的原始tensor，释放显存
+                # Immediately delete original tensors on GPU to release memory
                 del images, latents, log_probs, generator
                 torch.cuda.empty_cache()
                 
-                # 临时将 diffusion 模型移出 GPU 以为 EEG 模型腾出空间
+                # Temporarily move diffusion model off GPU to free space for EEG model
                 self.pipe.to('cpu')
                 torch.cuda.empty_cache()
                 
-                # 计算rewards
+                # Compute rewards
                 synthetic_eegs = self._generate_eeg_from_images(pil_images)
                 batch_rewards = [self._compute_eeg_similarity_reward(eeg, target_eeg_feature, self.subject) 
                                 for eeg in synthetic_eegs]
                 
-                # 将 diffusion 模型移回 GPU，数据也移回
+                # Move diffusion model back to GPU, also move data back
                 self.pipe.to(self.device)
                 latents = [lat.to(self.device) for lat in latents_cpu]
                 log_probs = [lp.to(self.device) for lp in log_probs_cpu]
-                # 🔥 CPU副本已经不需要了，立即删除
+                # CPU copies are no longer needed, delete immediately
                 del latents_cpu, log_probs_cpu
                 torch.cuda.empty_cache()
                 
-                # 更新最佳结果（不保存所有图像，节省内存）
+                # Update best result (don't save all images, conserve memory)
                 for img, r in zip(pil_images, batch_rewards):
                     total_samples_count += 1
                     if r > best_reward:
                         best_reward = r
                         best_image = img
                 
-                ########## Step 2: 立即训练这个batch（不累积） ##########
+                ########## Step 2: Train on this batch immediately (no accumulation) ##########
                 self.pipe.unet.train()
                 
-                # 构建单个batch的sample
+                # Build a single batch sample
                 sample = {
                     'timesteps': self.pipe.scheduler.timesteps.repeat(self.batch_size, 1),
                     'latents': torch.stack(latents, dim=1)[:, :-1],
@@ -1344,19 +1344,19 @@ class DDPOWrapper(BaseMethod):
                     'rewards': torch.tensor(batch_rewards, device=self.device),
                 }
                 
-                # 计算advantages（基于当前batch）
+                # Compute advantages (based on current batch)
                 rewards_np = sample['rewards'].cpu().numpy()
                 advantages = (rewards_np - rewards_np.mean()) / (rewards_np.std() + 1e-8)
                 sample['advantages'] = torch.tensor(advantages, device=self.device)
                 
-                # 训练参数
+                # Training parameters
                 num_timesteps = sample['timesteps'].shape[1]
                 num_train_timesteps = max(1, int(num_timesteps * 0.25))
                 
-                # 标记 latents 需要梯度
+                # Mark latents as requiring gradients
                 sample["latents"].requires_grad = True
                 
-                # 定义 callback 函数
+                # Define callback function
                 def callback_func(pipe_self, step_index, timestep, callback_kwargs):
                     nonlocal sample, num_train_timesteps
                     
@@ -1365,7 +1365,7 @@ class DDPOWrapper(BaseMethod):
                     
                     log_prob = callback_kwargs["log_prob"]
                     
-                    # 计算 PPO 损失
+                    # Compute PPO loss
                     advantages = torch.clamp(
                         sample["advantages"], -self.adv_clip_max, self.adv_clip_max
                     )
@@ -1376,10 +1376,10 @@ class DDPOWrapper(BaseMethod):
                     )
                     loss = torch.mean(torch.maximum(unclipped_loss, clipped_loss))
                     
-                    # 反向传播
+                    # Backpropagation
                     loss.backward()
                     
-                    # 在最后一个训练 timestep 更新参数
+                    # Update parameters at the last training timestep
                     if step_index == num_train_timesteps - 1:
                         torch.nn.utils.clip_grad_norm_(self.pipe.unet.parameters(), max_norm=1.0)
                         self.optimizer.step()
@@ -1387,7 +1387,7 @@ class DDPOWrapper(BaseMethod):
                     
                     return {"latents": sample["next_latents"][:, step_index]}
                 
-                # 执行训练
+                # Execute training
                 with torch.set_grad_enabled(True):
                     train_out = pipeline_with_logprob(
                         self.pipe,
@@ -1405,27 +1405,27 @@ class DDPOWrapper(BaseMethod):
                         enable_grad_checkpointing=True,
                     )
                 
-                # 🔥 立即清理当前batch的数据，释放显存
+                # Immediately clean up current batch data to release GPU memory
                 sample["latents"].requires_grad = False
-                # 🔥 DDPO：确保梯度被完全清零（防止梯度累积导致OOM）
+                # DDPO: ensure gradients are fully zeroed (prevent gradient accumulation causing OOM)
                 self.optimizer.zero_grad(set_to_none=True)
-                # 删除callback函数，释放其捕获的变量
+                # Delete callback function to release its captured variables
                 del callback_func
                 del sample, latents, log_probs, pil_images, synthetic_eegs, batch_rewards, train_out
                 torch.cuda.empty_cache()
                 
-                # 打印进度
+                # Print progress
                 if (batch_idx + 1) % max(1, num_batches_per_epoch // 5) == 0:
                     print(f"    Epoch {epoch+1}/{self.n_epochs}, Batch {batch_idx+1}/{num_batches_per_epoch}, Best Reward: {best_reward:.4f}")
         
-        #################### EVALUATION: 用优化后的模型重新生成图像 ####################
+        #################### EVALUATION: Re-generate images with the optimized model ####################
         print(f"  Generating final images with optimized model...")
         self.pipe.unet.eval()
         final_images = []
         final_rewards = []
         
-        # 生成几张图像来评估优化效果
-        num_eval_samples = min(5, budget // 2)  # 生成5张或更少
+        # Generate a few images to evaluate optimization effectiveness
+        num_eval_samples = min(5, budget // 2)  # Generate 5 or fewer
         
         with torch.no_grad():
             for _ in range(num_eval_samples):
@@ -1443,7 +1443,7 @@ class DDPOWrapper(BaseMethod):
                 eval_pil = [Image.fromarray((img.float().cpu().numpy().transpose(1,2,0)*255).astype(np.uint8)) 
                            for img in eval_images]
                 
-                # 计算最终奖励
+                # Compute final reward
                 self.pipe.to('cpu')
                 torch.cuda.empty_cache()
                 
@@ -1457,7 +1457,7 @@ class DDPOWrapper(BaseMethod):
                 final_images.extend(eval_pil)
                 final_rewards.extend(eval_rewards_batch)
         
-        # 🔥 修改：使用评估阶段生成的图像的平均分数作为最终指标
+        # Use the average score of evaluation-phase images as the final metric
         if len(final_rewards) > 0:
             avg_reward = np.mean(final_rewards)
             eval_best_idx = np.argmax(final_rewards)
@@ -1466,42 +1466,42 @@ class DDPOWrapper(BaseMethod):
             print(f"  Individual rewards: {[f'{r:.4f}' for r in final_rewards]}")
             print(f"  (Training best was: {best_reward:.4f})")
             
-            # 使用平均分数作为最终指标
+            # Use average score as the final metric
             best_reward = avg_reward
-            best_image = eval_best_image  # 保留最好的那张作为代表图像
+            best_image = eval_best_image  # Keep the best one as the representative image
         else:
             print(f"  Warning: No evaluation images generated. Keeping training best: {best_reward:.4f}")
         
         elapsed_time = time.time() - start_time
         
-        # 🔥 关键：训练结束后立即移除LoRA adapters释放显存
+        # Critical: remove LoRA adapters immediately after training to release GPU memory
         if hasattr(self.pipe.unet, 'peft_config') and len(self.pipe.unet.peft_config) > 0:
             self.pipe.unet.delete_adapters(list(self.pipe.unet.peft_config.keys()))
         
-        # 清理显存
+        # Clean up GPU memory
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
         
         return {
-            'images': final_images,  # 返回评估图像
-            'best_image': best_image,  # 来自训练过程
+            'images': final_images,  # Return evaluation images
+            'best_image': best_image,  # From training process
             'rewards': final_rewards,
-            'best_reward': best_reward,  # 来自训练过程
+            'best_reward': best_reward,  # From training process
             'time': elapsed_time,
-            'n_samples': total_samples_count + len(final_images),  # 训练样本 + 评估样本
+            'n_samples': total_samples_count + len(final_images),  # Training samples + evaluation samples
             'metadata': {'n_epochs': self.n_epochs, 'batch_size': self.batch_size, 'training_samples': total_samples_count}
         }
     
     def reset(self):
-        """重置 DDPO 状态，清理 LoRA 权重并释放显存"""
+        """Reset DDPO state, clean up LoRA weights and release GPU memory"""
         from peft import LoraConfig
         
-        # 重新初始化 LoRA（移除旧的适配器）
+        # Re-initialize LoRA (remove old adapters)
         if hasattr(self.pipe.unet, 'peft_config') and len(self.pipe.unet.peft_config) > 0:
             self.pipe.unet.delete_adapters(list(self.pipe.unet.peft_config.keys()))
         
-        # 重新配置 LoRA
+        # Re-configure LoRA
         unet_lora_config = LoraConfig(
             r=16,
             lora_alpha=16,
@@ -1510,12 +1510,12 @@ class DDPOWrapper(BaseMethod):
         )
         self.pipe.unet.add_adapter(unet_lora_config)
         
-        # LoRA参数设为float32
+        # Set LoRA parameters to float32
         for param in self.pipe.unet.parameters():
             if param.requires_grad:
                 param.data = param.to(torch.float32)
         
-        # 重新创建优化器
+        # Re-create optimizer
         trainable_params = filter(lambda p: p.requires_grad, self.pipe.unet.parameters())
         self.optimizer = torch.optim.AdamW(
             trainable_params,
@@ -1525,14 +1525,14 @@ class DDPOWrapper(BaseMethod):
             eps=1e-8
         )
         
-        # 清理显存
+        # Clean up GPU memory
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
 
 class DPOKWrapper(BaseMethod):
-    """DPOK方法的包装器 - 基于d3po实现，添加KL散度约束"""
+    """DPOK method wrapper - based on d3po implementation, with KL divergence constraint"""
     
     def __init__(self, config, device="cuda", shared_models=None):
         super().__init__(config, device)
@@ -1540,26 +1540,26 @@ class DPOKWrapper(BaseMethod):
         
         print(f"Initializing {self.name}...")
         
-        # 导入依赖
+        # Import dependencies
         from peft import LoraConfig
         from model.ATMS_retrieval import ATMS, get_eeg_features
         import sys
         sys.path.append('/home/ldy/Workspace/guide-stable-diffusion/related_works/d3po/d3po')
         
-        # 检查是否使用共享模型
+        # Check whether to use shared models
         if shared_models is not None:
             print("  Using shared models...")
-            # 使用共享的模型实例
+            # Use shared model instances
             self.eeg_model = shared_models.get('eeg_model')
             self.encoding_model = shared_models.get('encoding_model')
             
-            # 🔥 使用共享的SDXL pipeline（不创建新的！）
+            # Use the shared SDXL pipeline (don't create a new one!)
             self.pipe = shared_models.get('sdxl_pipe')
             if self.pipe is None:
                 raise ValueError("Shared SDXL pipeline not found!")
             print("  Using shared SDXL pipeline")
         else:
-            # 独立模式：创建自己的 pipeline 和模型
+            # Standalone mode: create own pipeline and models
             print("  Standalone mode: loading independently...")
             self.pipe = self._create_independent_pipeline(device)
             self.eeg_model = self._load_eeg_model(config['eeg_model_path'])
@@ -1567,24 +1567,24 @@ class DPOKWrapper(BaseMethod):
         
         self.subject = config.get('subject', 'sub-01')
         
-        # 训练参数
+        # Training parameters
         self.n_epochs = config.get('n_epochs', 5)
         self.batch_size = config.get('batch_size', 4)
         self.learning_rate = config.get('learning_rate', 3e-5)
         self.use_lora = config.get('use_lora', True)
         self.clip_range = config.get('clip_range', 1e-4)
         self.adv_clip_max = config.get('adv_clip_max', 5)
-        self.kl_ratio = config.get('kl_ratio', 0.01)  # DPOK特有：KL散度系数
+        self.kl_ratio = config.get('kl_ratio', 0.01)  # DPOK-specific: KL divergence coefficient
         self.num_inference_steps = config.get('num_inference_steps', 8)
         self.guidance_scale = 0.0
         self.eta = 0.0
         
-        # 冻结非训练组件
+        # Freeze non-trainable components
         self.pipe.vae.requires_grad_(False)
         self.pipe.text_encoder.requires_grad_(False)
         self.pipe.text_encoder_2.requires_grad_(False)
         
-        # 🔥 延迟配置LoRA：在optimize()时再添加，避免与其他方法冲突
+        # Deferred LoRA configuration: add at optimize() time to avoid conflicts with other methods
         print("  LoRA will be configured on first optimize() call")
         self.lora_config = LoraConfig(
             r=16,
@@ -1592,20 +1592,20 @@ class DPOKWrapper(BaseMethod):
             init_lora_weights="gaussian",
             target_modules=["to_k", "to_q", "to_v", "to_out.0"],
         )
-        self.optimizer = None  # 优化器也延迟创建
+        self.optimizer = None  # Optimizer is also deferred
         
         print(f"  DPOK initialized: {self.n_epochs} epochs, batch_size={self.batch_size}, kl_ratio={self.kl_ratio}")
     
     def _create_independent_pipeline(self, device):
-        """创建独立的 SDXL pipeline（与其他方法使用相同的模型）"""
+        """Create an independent SDXL pipeline (using the same model as other methods)"""
         from diffusers import AutoencoderKL, DDIMScheduler, UNet2DConditionModel, StableDiffusionXLPipeline
         from safetensors.torch import load_file
         from huggingface_hub import hf_hub_download
         
-        # 使用与 Generator4Embeds 相同的模型配置
+        # Use the same model configuration as Generator4Embeds
         model_id = "stabilityai/stable-diffusion-xl-base-1.0"
         
-        # 加载 UNet（SDXL-Lightning 8步模型）
+        # Load UNet (SDXL-Lightning 8-step model)
         unet = UNet2DConditionModel.from_pretrained(
             model_id, 
             subfolder="unet", 
@@ -1618,20 +1618,20 @@ class DPOKWrapper(BaseMethod):
             "sdxl_lightning_8step_unet.safetensors"
         )))
         
-        # 加载 VAE
+        # Load VAE
         vae = AutoencoderKL.from_pretrained(
             "madebyollin/sdxl-vae-fp16-fix", 
             torch_dtype=torch.bfloat16
         )
         
-        # 加载 Scheduler
+        # Load Scheduler
         scheduler = DDIMScheduler.from_pretrained(
             model_id, 
             subfolder="scheduler",
             timestep_spacing="trailing"
         )
         
-        # 创建 pipeline（不使用 ExtendedStableDiffusionXLPipeline，避免 IP-Adapter 相关代码）
+        # Create pipeline (not using ExtendedStableDiffusionXLPipeline to avoid IP-Adapter related code)
         pipe = StableDiffusionXLPipeline.from_pretrained(
             model_id, 
             unet=unet, 
@@ -1648,43 +1648,43 @@ class DPOKWrapper(BaseMethod):
         return pipe
         
     def optimize(self, target_eeg_feature, target_idx, budget=50):
-        """运行DPOK优化（基于d3po的实现，添加KL散度约束）"""
-        # 实现与DDPO类似，只是在loss中添加KL散度项
-        # 为了简洁，这里省略详细实现，与benchmark_framework.py中的DPOKWrapper一致
-        # 请参考上面DDPOWrapper的实现，在callback_func中添加KL散度约束即可
+        """Run DPOK optimization (based on d3po, with KL divergence constraint)"""
+        # Implementation similar to DDPO, but adds a KL divergence term in the loss
+        # For brevity, detailed implementation is omitted; consistent with DPOKWrapper in benchmark_framework.py
+        # Refer to DDPOWrapper above and add KL divergence constraint in callback_func
         pass
     
     def reset(self):
-        """重置 DPOK 状态"""
+        """Reset DPOK state"""
         pass
 
 
 class D3POWrapper(BaseMethod):
-    """D3PO方法的包装器 - 基于d3po实现，使用pairwise preference learning"""
+    """D3PO method wrapper - based on d3po implementation, using pairwise preference learning"""
     
     def __init__(self, config, device="cuda", shared_models=None):
         super().__init__(config, device)
         self.name = "D3PO"
         print(f"Initializing {self.name}...")
-        # 详细实现省略，与benchmark_framework.py中一致
+        # Detailed implementation omitted; consistent with benchmark_framework.py
         pass
     
     def optimize(self, target_eeg_feature, target_idx, budget=50):
-        """运行D3PO优化"""
+        """Run D3PO optimization"""
         pass
     
     def reset(self):
-        """重置D3PO状态"""
+        """Reset D3PO state"""
         pass
 
 
-# ==================== 新增方法 1: Bayesian Optimization ====================
+# ==================== Additional Method 1: Bayesian Optimization ====================
 
 class BayesianOptimizationWrapper(BaseMethod):
     """
-    Bayesian Optimization方法的包装器
-    在CLIP embedding space中优化（与PseudoModel保持一致）
-    使用高斯过程建模目标函数（EEG相似度），通过acquisition function选择下一个采样点
+    Bayesian Optimization method wrapper.
+    Optimizes in CLIP embedding space (consistent with PseudoModel).
+    Uses Gaussian process to model the objective function (EEG similarity) and selects next sampling point via acquisition function.
     """
     
     def __init__(self, config, device="cuda", shared_models=None):
@@ -1693,7 +1693,7 @@ class BayesianOptimizationWrapper(BaseMethod):
         
         print(f"Initializing {self.name}...")
         
-        # 检查是否使用共享模型
+        # Check whether to use shared models
         if shared_models is not None:
             print("  Using shared models...")
             self.eeg_model = shared_models.get('eeg_model')
@@ -1701,7 +1701,7 @@ class BayesianOptimizationWrapper(BaseMethod):
             self.vlmodel = shared_models.get('vlmodel')
             self.preprocess_train = shared_models.get('preprocess_train')
             
-            # 🔥 使用共享的SDXL pipeline（通过Generator）
+            # Use the shared SDXL pipeline (via Generator)
             self.pipe = shared_models.get('sdxl_pipe')
             if self.pipe is None:
                 raise ValueError("Shared SDXL pipeline not found!")
@@ -1713,26 +1713,26 @@ class BayesianOptimizationWrapper(BaseMethod):
             self.eeg_model = self._load_eeg_model(config['eeg_model_path'])
             self.encoding_model = self._load_encoding_model(config['encoding_model_path'])
             
-            # 独立模式：加载pipe
+            # Standalone mode: load pipe
             from exp_batch_offline_generation import pipe
             self.pipe = pipe
         
         self.subject = config.get('subject', 'sub-01')
         
-        # 🔥 创建独立的随机数生成器（避免与其他方法冲突）
+        # Create an independent random number generator (to avoid conflicts with other methods)
         self.rng = np.random.RandomState(seed=42)
         self.torch_generator = torch.Generator(device=device).manual_seed(42)
         
-        # BO特有参数
+        # BO-specific parameters
         self.acquisition = config.get('acquisition', 'ucb')  # 'ucb', 'ei', 'poi'
-        self.kappa = config.get('kappa', 2.5)  # UCB的exploration参数
-        self.xi = config.get('xi', 0.01)  # EI/POI的exploration参数
-        self.n_initial_points = config.get('n_initial_points', 10)  # 初始随机采样点数
+        self.kappa = config.get('kappa', 2.5)  # UCB exploration parameter
+        self.xi = config.get('xi', 0.01)  # EI/POI exploration parameter
+        self.n_initial_points = config.get('n_initial_points', 10)  # Number of initial random samples
         
-        # CLIP embedding维度
+        # CLIP embedding dimension
         self.clip_dim = 1024
         
-        # 图像生成参数
+        # Image generation parameters
         self.num_inference_steps = 8
         self.guidance_scale = 0.0
         
@@ -1742,12 +1742,12 @@ class BayesianOptimizationWrapper(BaseMethod):
     
     def _sample_clip_embedding(self, n_samples=1):
         """
-        采样CLIP embeddings（在CLIP embedding space中）
-        Returns: List[np.ndarray], 每个shape为 (1024,)
+        Sample CLIP embeddings (in CLIP embedding space)
+        Returns: List[np.ndarray], each with shape (1024,)
         """
         embeddings = []
         for _ in range(n_samples):
-            # 🔥 使用独立的随机数生成器
+            # Use independent random number generator
             emb = self.rng.randn(self.clip_dim).astype(np.float32)
             emb = emb / (np.linalg.norm(emb) + 1e-8)
             embeddings.append(emb)
@@ -1755,28 +1755,28 @@ class BayesianOptimizationWrapper(BaseMethod):
     
     def _clip_embedding_to_image(self, clip_embedding):
         """
-        从CLIP embedding直接生成PIL图像（使用IP-Adapter）
+        Generate a PIL image directly from a CLIP embedding (using IP-Adapter)
         Args:
             clip_embedding: np.ndarray, shape (1024,)
         Returns:
             PIL.Image
         """
-        # 转换为torch tensor
+        # Convert to torch tensor
         clip_tensor = torch.tensor(clip_embedding, device=self.device, dtype=torch.float32).unsqueeze(0)
         
-        # 直接使用IP-Adapter从CLIP embedding生成图像（不需要PseudoTargetModel）
+        # Generate image directly from CLIP embedding using IP-Adapter (no PseudoTargetModel needed)
         with torch.no_grad():
-            # 🔥 使用独立的随机数生成器生成latent
+            # Use independent random number generator to produce latent
             latents = torch.randn(
                 1, 4, 
                 self.pipe.unet.config.sample_size, 
                 self.pipe.unet.config.sample_size, 
                 device=self.device,
                 dtype=torch.bfloat16,
-                generator=self.torch_generator  # 🔥 添加 generator
+                generator=self.torch_generator  # Add generator
             )
             
-            # 使用IP-Adapter生成图像
+            # Generate image using IP-Adapter
             output = self.pipe(
                 prompt=[""],
                 ip_adapter_image_embeds=[clip_tensor.unsqueeze(0).type(torch.bfloat16)],
@@ -1787,28 +1787,28 @@ class BayesianOptimizationWrapper(BaseMethod):
                 eta=1.0,
             )
             
-            # 解码latents为图像
+            # Decode latents to images
             shift_factor = self.pipe.vae.config.shift_factor if self.pipe.vae.config.shift_factor else 0.0
             decoded_latents = (output.images / self.pipe.vae.config.scaling_factor) + shift_factor
             images = self.pipe.vae.decode(decoded_latents, return_dict=False)[0]
             images = self.pipe.image_processor.postprocess(images.detach())
         
-        return images[0]  # 返回第一张PIL图像
+        return images[0]  # Return the first PIL image
     
     def _gaussian_process_predict(self, X_train, y_train, X_test):
         """
-        简化的高斯过程预测
+        Simplified Gaussian process prediction
         Args:
             X_train: np.ndarray, shape (n_train, latent_dim)
             y_train: np.ndarray, shape (n_train,)
             X_test: np.ndarray, shape (n_test, latent_dim)
         Returns:
-            mu: np.ndarray, shape (n_test,), 预测均值
-            sigma: np.ndarray, shape (n_test,), 预测标准差
+            mu: np.ndarray, shape (n_test,), predicted mean
+            sigma: np.ndarray, shape (n_test,), predicted standard deviation
         """
         from scipy.spatial.distance import cdist
         
-        # 使用RBF核（简化版本）
+        # Use RBF kernel (simplified version)
         length_scale = 1.0
         noise = 1e-6
         
@@ -1822,14 +1822,14 @@ class BayesianOptimizationWrapper(BaseMethod):
         # K(X_test, X_test)
         K_ss = np.exp(-cdist(X_test, X_test, 'sqeuclidean') / (2 * length_scale**2))
         
-        # 预测
+        # Predict
         try:
             K_inv = np.linalg.inv(K)
             mu = K_s @ K_inv @ y_train
             cov = K_ss - K_s @ K_inv @ K_s.T
             sigma = np.sqrt(np.maximum(np.diag(cov), 1e-10))
         except np.linalg.LinAlgError:
-            # 如果矩阵不可逆，返回均值预测
+            # If matrix is not invertible, return mean prediction
             mu = np.mean(y_train) * np.ones(len(X_test))
             sigma = np.std(y_train) * np.ones(len(X_test))
         
@@ -1837,11 +1837,11 @@ class BayesianOptimizationWrapper(BaseMethod):
     
     def _acquisition_function(self, mu, sigma, y_best):
         """
-        计算acquisition function
+        Compute the acquisition function
         Args:
-            mu: np.ndarray, GP预测均值
-            sigma: np.ndarray, GP预测标准差
-            y_best: float, 当前最佳观测值
+            mu: np.ndarray, GP predicted mean
+            sigma: np.ndarray, GP predicted standard deviation
+            y_best: float, current best observed value
         Returns:
             acquisition_values: np.ndarray
         """
@@ -1871,13 +1871,13 @@ class BayesianOptimizationWrapper(BaseMethod):
             raise ValueError(f"Unknown acquisition function: {self.acquisition}")
     
     def optimize(self, target_eeg_feature, target_idx, budget=50):
-        """运行Bayesian Optimization优化（在CLIP embedding space中）"""
+        """Run Bayesian Optimization (in CLIP embedding space)"""
         start_time = time.time()
         
         print(f"  [BayesianOpt] Starting optimization with budget={budget}")
         print(f"  [BayesianOpt] Optimizing in CLIP embedding space (dim={self.clip_dim})")
         
-        # 存储所有采样点和对应的reward
+        # Store all sampled points and corresponding rewards
         all_embeddings = []  # List of CLIP embeddings
         all_rewards = []
         all_images = []
@@ -1885,22 +1885,22 @@ class BayesianOptimizationWrapper(BaseMethod):
         best_reward = -float('inf')
         best_image = None
         
-        # Step 1: 初始随机采样
+        # Step 1: Initial random sampling
         n_initial = min(self.n_initial_points, budget)
         print(f"  [BayesianOpt] Phase 1: Random initialization ({n_initial} samples)")
         
         for i in range(n_initial):
-            # 采样CLIP embedding
+            # Sample CLIP embedding
             clip_emb = self._sample_clip_embedding(1)[0]
             
-            # 从CLIP embedding生成图像
+            # Generate image from CLIP embedding
             image = self._clip_embedding_to_image(clip_emb)
             
-            # 计算reward
+            # Compute reward
             eeg = self._generate_eeg_from_images([image])[0]
             reward = self._compute_eeg_similarity_reward(eeg, target_eeg_feature, self.subject)
             
-            # 存储结果
+            # Store results
             all_embeddings.append(clip_emb)
             all_rewards.append(reward)
             all_images.append(image)
@@ -1912,7 +1912,7 @@ class BayesianOptimizationWrapper(BaseMethod):
             if (i + 1) % 5 == 0:
                 print(f"    Initial sampling: {i+1}/{n_initial}, Best reward: {best_reward:.4f}")
         
-        # Step 2: Bayesian Optimization迭代
+        # Step 2: Bayesian Optimization iterations
         n_bo_iterations = budget - n_initial
         print(f"  [BayesianOpt] Phase 2: BO iterations ({n_bo_iterations} samples)")
         
@@ -1920,28 +1920,28 @@ class BayesianOptimizationWrapper(BaseMethod):
         y_train = np.array(all_rewards)  # shape: (n_samples,)
         
         for i in range(n_bo_iterations):
-            # 生成候选点（在CLIP embedding space中随机采样一批）
+            # Generate candidate points (randomly sample a batch in CLIP embedding space)
             n_candidates = 100
             candidate_embeddings = self._sample_clip_embedding(n_candidates)
             X_candidates = np.array(candidate_embeddings)
             
-            # 使用GP预测候选点的均值和方差
+            # Use GP to predict mean and variance for candidate points
             mu, sigma = self._gaussian_process_predict(X_train, y_train, X_candidates)
             
-            # 计算acquisition function
+            # Compute acquisition function
             y_best = np.max(y_train)
             acq_values = self._acquisition_function(mu, sigma, y_best)
             
-            # 选择acquisition function最大的点
+            # Select the point with the highest acquisition function value
             best_candidate_idx = np.argmax(acq_values)
             next_embedding = X_candidates[best_candidate_idx]
             
-            # 从CLIP embedding生成图像并计算reward
+            # Generate image from CLIP embedding and compute reward
             image = self._clip_embedding_to_image(next_embedding)
             eeg = self._generate_eeg_from_images([image])[0]
             reward = self._compute_eeg_similarity_reward(eeg, target_eeg_feature, self.subject)
             
-            # 更新训练集
+            # Update training set
             X_train = np.vstack([X_train, next_embedding])
             y_train = np.append(y_train, reward)
             
@@ -1960,7 +1960,7 @@ class BayesianOptimizationWrapper(BaseMethod):
         
         print(f"  [BayesianOpt] Optimization complete: best optimization reward = {best_reward:.4f}")
         
-        # 🔥 优化完成后，使用最优CLIP embedding生成5张图像用于最终评估
+        # After optimization, generate 5 images using the best CLIP embedding for final evaluation
         print(f"  [BayesianOpt] Generating 5 final samples for evaluation...")
         best_embedding = X_train[np.argmax(y_train)]
         
@@ -1969,7 +1969,7 @@ class BayesianOptimizationWrapper(BaseMethod):
         num_eval_samples = 5
         
         for i in range(num_eval_samples):
-            # 从最优embedding生成图像（每次latents不同）
+            # Generate image from the best embedding (different latents each time)
             image = self._clip_embedding_to_image(best_embedding)
             eeg = self._generate_eeg_from_images([image])[0]
             reward = self._compute_eeg_similarity_reward(eeg, target_eeg_feature, self.subject)
@@ -1977,28 +1977,28 @@ class BayesianOptimizationWrapper(BaseMethod):
             final_images.append(image)
             final_rewards.append(reward)
             
-            # 🔥 立即释放中间变量（EEG特征占用显存）
+            # Immediately release intermediate variables (EEG features consume GPU memory)
             del eeg
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         
-        # 计算平均分数
+        # Compute average score
         final_score = np.mean(final_rewards)
         best_eval_image = final_images[np.argmax(final_rewards)]
         
         print(f"  [BayesianOpt] Final evaluation: mean = {final_score:.4f}, std = {np.std(final_rewards):.4f}")
         print(f"  [BayesianOpt] Individual rewards: {[f'{r:.4f}' for r in final_rewards]}")
         
-        # 清理显存
+        # Clean up GPU memory
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
         
         return {
-            'images': final_images,  # 最终评估的5张图像
+            'images': final_images,  # 5 images from final evaluation
             'best_image': best_eval_image,
             'rewards': final_rewards,
-            'best_reward': final_score,  # 5张的平均值
+            'best_reward': final_score,  # Average of 5 images
             'time': elapsed_time,
             'n_samples': budget,
             'metadata': {
@@ -2008,24 +2008,24 @@ class BayesianOptimizationWrapper(BaseMethod):
                 'optimization_space': 'CLIP_embedding',
                 'num_eval_samples': num_eval_samples,
                 'eval_rewards_std': float(np.std(final_rewards)),
-                'optimization_best': best_reward  # 优化过程中的最优值
+                'optimization_best': best_reward  # Best value during optimization
             }
         }
     
     def reset(self):
-        """重置BO状态"""
+        """Reset BO state"""
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
 
-# ==================== 新增方法 2: CMA-ES ====================
+# ==================== Additional Method 2: CMA-ES ====================
 
 class CMAESWrapper(BaseMethod):
     """
-    CMA-ES (Covariance Matrix Adaptation Evolution Strategy) 方法的包装器
-    在CLIP embedding space中优化（与PseudoModel保持一致）
-    维护一个多变量高斯分布，通过进化策略优化CLIP embedding
+    CMA-ES (Covariance Matrix Adaptation Evolution Strategy) method wrapper.
+    Optimizes in CLIP embedding space (consistent with PseudoModel).
+    Maintains a multivariate Gaussian distribution and optimizes CLIP embedding via evolution strategy.
     """
     
     def __init__(self, config, device="cuda", shared_models=None):
@@ -2034,7 +2034,7 @@ class CMAESWrapper(BaseMethod):
         
         print(f"Initializing {self.name}...")
         
-        # 检查是否使用共享模型
+        # Check whether to use shared models
         if shared_models is not None:
             print("  Using shared models...")
             self.eeg_model = shared_models.get('eeg_model')
@@ -2042,7 +2042,7 @@ class CMAESWrapper(BaseMethod):
             self.vlmodel = shared_models.get('vlmodel')
             self.preprocess_train = shared_models.get('preprocess_train')
             
-            # 使用共享的SDXL pipeline（通过Generator）
+            # Use the shared SDXL pipeline (via Generator)
             self.pipe = shared_models.get('sdxl_pipe')
             if self.pipe is None:
                 raise ValueError("Shared SDXL pipeline not found!")
@@ -2054,24 +2054,24 @@ class CMAESWrapper(BaseMethod):
             self.eeg_model = self._load_eeg_model(config['eeg_model_path'])
             self.encoding_model = self._load_encoding_model(config['encoding_model_path'])
             
-            # 独立模式：加载pipe
+            # Standalone mode: load pipe
             from exp_batch_offline_generation import pipe
             self.pipe = pipe
         
         self.subject = config.get('subject', 'sub-01')
         
-        # 🔥 创建独立的随机数生成器（使用不同的种子避免与BO冲突）
+        # Create an independent random number generator (using a different seed to avoid conflict with BO)
         self.rng = np.random.RandomState(seed=43)
         self.torch_generator = torch.Generator(device=device).manual_seed(43)
         
-        # CMA-ES特有参数
+        # CMA-ES specific parameters
         self.population_size = config.get('population_size', 10)
         self.sigma = config.get('sigma', 0.5)
         
-        # CLIP embedding维度
+        # CLIP embedding dimension
         self.clip_dim = 1024
         
-        # 图像生成参数
+        # Image generation parameters
         self.num_inference_steps = 8
         self.guidance_scale = 0.0
         
@@ -2081,28 +2081,28 @@ class CMAESWrapper(BaseMethod):
     
     def _clip_embedding_to_image(self, clip_embedding):
         """
-        从CLIP embedding直接生成PIL图像（使用IP-Adapter）
+        Generate a PIL image directly from a CLIP embedding (using IP-Adapter)
         Args:
             clip_embedding: np.ndarray, shape (1024,)
         Returns:
             PIL.Image
         """
-        # 转换为torch tensor
+        # Convert to torch tensor
         clip_tensor = torch.tensor(clip_embedding, device=self.device, dtype=torch.float32).unsqueeze(0)
         
-        # 直接使用IP-Adapter从CLIP embedding生成图像（不需要PseudoTargetModel）
+        # Generate image directly from CLIP embedding using IP-Adapter (no PseudoTargetModel needed)
         with torch.no_grad():
-            # 🔥 使用独立的随机数生成器生成latent
+            # Use independent random number generator to produce latent
             latents = torch.randn(
                 1, 4, 
                 self.pipe.unet.config.sample_size, 
                 self.pipe.unet.config.sample_size, 
                 device=self.device,
                 dtype=torch.bfloat16,
-                generator=self.torch_generator  # 🔥 添加 generator
+                generator=self.torch_generator  # Add generator
             )
             
-            # 使用IP-Adapter生成图像
+            # Generate image using IP-Adapter
             output = self.pipe(
                 prompt=[""],
                 ip_adapter_image_embeds=[clip_tensor.unsqueeze(0).type(torch.bfloat16)],
@@ -2113,16 +2113,16 @@ class CMAESWrapper(BaseMethod):
                 eta=1.0,
             )
             
-            # 解码latents为图像
+            # Decode latents to images
             shift_factor = self.pipe.vae.config.shift_factor if self.pipe.vae.config.shift_factor else 0.0
             decoded_latents = (output.images / self.pipe.vae.config.scaling_factor) + shift_factor
             images = self.pipe.vae.decode(decoded_latents, return_dict=False)[0]
             images = self.pipe.image_processor.postprocess(images.detach())
         
-        return images[0]  # 返回第一张PIL图像
+        return images[0]  # Return the first PIL image
     
     def optimize(self, target_eeg_feature, target_idx, budget=50):
-        """运行CMA-ES优化（在CLIP embedding space中）"""
+        """Run CMA-ES optimization (in CLIP embedding space)"""
         try:
             import cma
         except ImportError:
@@ -2135,14 +2135,14 @@ class CMAESWrapper(BaseMethod):
         print(f"  [CMA-ES] Starting optimization with budget={budget}")
         print(f"  [CMA-ES] Optimizing in CLIP embedding space (dim={self.clip_dim})")
         
-        # 初始均值（零向量）
+        # Initial mean (zero vector)
         x0 = np.zeros(self.clip_dim)
         
-        # CMA-ES优化器
+        # CMA-ES optimizer
         es = cma.CMAEvolutionStrategy(x0, self.sigma, {
             'popsize': self.population_size,
             'maxiter': budget // self.population_size,
-            'verb_disp': 0,  # 禁用verbose输出
+            'verb_disp': 0,  # Disable verbose output
             'verbose': -1
         })
         
@@ -2157,28 +2157,28 @@ class CMAESWrapper(BaseMethod):
         while not es.stop() and n_evaluations < budget:
             generation += 1
             
-            # 采样population
+            # Sample population
             solutions = es.ask()
             
-            # 评估每个solution
+            # Evaluate each solution
             fitness_list = []
             
             for solution in solutions:
                 if n_evaluations >= budget:
                     break
                 
-                # 归一化为单位向量（CLIP embedding通常是归一化的）
+                # Normalize to unit vector (CLIP embeddings are typically normalized)
                 clip_emb = solution / (np.linalg.norm(solution) + 1e-8)
                 clip_emb = clip_emb.astype(np.float32)
                 
-                # 从CLIP embedding生成图像
+                # Generate image from CLIP embedding
                 image = self._clip_embedding_to_image(clip_emb)
                 
-                # 计算reward
+                # Compute reward
                 eeg = self._generate_eeg_from_images([image])[0]
                 reward = self._compute_eeg_similarity_reward(eeg, target_eeg_feature, self.subject)
                 
-                # CMA-ES最小化目标，所以取负值
+                # CMA-ES minimizes, so negate the reward
                 fitness = -reward
                 fitness_list.append(fitness)
                 
@@ -2190,7 +2190,7 @@ class CMAESWrapper(BaseMethod):
                     best_reward = reward
                     best_image = image
             
-            # 更新CMA-ES
+            # Update CMA-ES
             es.tell(solutions[:len(fitness_list)], fitness_list)
             
             print(f"    Generation {generation}, Evaluations: {n_evaluations}/{budget}, Best reward: {best_reward:.4f}")
@@ -2199,9 +2199,9 @@ class CMAESWrapper(BaseMethod):
         
         print(f"  [CMA-ES] Optimization complete: best optimization reward = {best_reward:.4f}")
         
-        # 🔥 优化完成后，使用最优解生成5张图像用于最终评估
+        # After optimization, generate 5 images using the best solution for final evaluation
         print(f"  [CMA-ES] Generating 5 final samples for evaluation...")
-        best_solution = es.result.xbest  # CMA-ES的最优解
+        best_solution = es.result.xbest  # CMA-ES's best solution
         best_clip_emb = best_solution / (np.linalg.norm(best_solution) + 1e-8)
         
         final_images = []
@@ -2209,7 +2209,7 @@ class CMAESWrapper(BaseMethod):
         num_eval_samples = 5
         
         for i in range(num_eval_samples):
-            # 从最优embedding生成图像（每次latents不同）
+            # Generate image from the best embedding (different latents each time)
             image = self._clip_embedding_to_image(best_clip_emb)
             eeg = self._generate_eeg_from_images([image])[0]
             reward = self._compute_eeg_similarity_reward(eeg, target_eeg_feature, self.subject)
@@ -2217,28 +2217,28 @@ class CMAESWrapper(BaseMethod):
             final_images.append(image)
             final_rewards.append(reward)
             
-            # 🔥 立即释放中间变量（EEG特征占用显存）
+            # Immediately release intermediate variables (EEG features consume GPU memory)
             del eeg
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         
-        # 计算平均分数
+        # Compute average score
         final_score = np.mean(final_rewards)
         best_eval_image = final_images[np.argmax(final_rewards)]
         
         print(f"  [CMA-ES] Final evaluation: mean = {final_score:.4f}, std = {np.std(final_rewards):.4f}")
         print(f"  [CMA-ES] Individual rewards: {[f'{r:.4f}' for r in final_rewards]}")
         
-        # 清理显存
+        # Clean up GPU memory
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
         
         return {
-            'images': final_images,  # 最终评估的5张图像
+            'images': final_images,  # 5 images from final evaluation
             'best_image': best_eval_image,
             'rewards': final_rewards,
-            'best_reward': final_score,  # 5张的平均值
+            'best_reward': final_score,  # Average of 5 images
             'time': elapsed_time,
             'n_samples': n_evaluations,
             'metadata': {
@@ -2249,12 +2249,12 @@ class CMAESWrapper(BaseMethod):
                 'clip_dim': self.clip_dim,
                 'num_eval_samples': num_eval_samples,
                 'eval_rewards_std': float(np.std(final_rewards)),
-                'optimization_best': best_reward  # 优化过程中的最优值
+                'optimization_best': best_reward  # Best value during optimization
             }
         }
     
     def _fallback_random_sampling(self, target_eeg_feature, budget):
-        """如果CMA库不可用，回退到随机采样（在CLIP embedding space中）"""
+        """Fallback to random sampling in CLIP embedding space if the CMA library is unavailable"""
         start_time = time.time()
         
         print(f"  [CMA-ES Fallback] Using random sampling in CLIP embedding space with budget={budget}")
@@ -2265,14 +2265,14 @@ class CMAESWrapper(BaseMethod):
         best_image = None
         
         for i in range(budget):
-            # 随机采样CLIP embedding
+            # Randomly sample CLIP embedding
             clip_emb = np.random.randn(self.clip_dim).astype(np.float32)
-            clip_emb = clip_emb / (np.linalg.norm(clip_emb) + 1e-8)  # 归一化
+            clip_emb = clip_emb / (np.linalg.norm(clip_emb) + 1e-8)  # Normalize
             
-            # 从CLIP embedding生成图像
+            # Generate image from CLIP embedding
             image = self._clip_embedding_to_image(clip_emb)
             
-            # 计算reward
+            # Compute reward
             eeg = self._generate_eeg_from_images([image])[0]
             reward = self._compute_eeg_similarity_reward(eeg, target_eeg_feature, self.subject)
             
@@ -2306,7 +2306,7 @@ class CMAESWrapper(BaseMethod):
         }
     
     def reset(self):
-        """重置CMA-ES状态"""
+        """Reset CMA-ES state"""
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
@@ -2315,12 +2315,12 @@ class CMAESWrapper(BaseMethod):
 # ==================== Benchmark Framework ====================
 
 class BenchmarkFramework:
-    """主benchmark框架（支持全部6种方法）"""
+    """Main benchmark framework (supports all 6 methods)"""
     
     def __init__(self, config_path: str):
         """
         Args:
-            config_path: 配置文件路径（JSON格式）
+            config_path: Path to configuration file (JSON format)
         """
         with open(config_path, 'r') as f:
             self.config = json.load(f)
@@ -2329,33 +2329,33 @@ class BenchmarkFramework:
         self.output_dir = self.config.get('output_dir', './benchmark_results_total')
         os.makedirs(self.output_dir, exist_ok=True)
         
-        # 🔥 创建共享模型（避免重复加载）
+        # Create shared models (to avoid redundant loading)
         print("\n" + "="*60)
         print("Loading Shared Models (to save GPU memory)...")
         print("="*60)
         self.shared_models = self._load_shared_models()
         
-        # 初始化所有方法
+        # Initialize all methods
         self.methods = self._initialize_methods()
         
-        # 加载targets
+        # Load targets
         self.targets = self._load_targets()
         
         print(f"Initialized {len(self.methods)} methods")
         print(f"Loaded {len(self.targets)} targets")
     
     def _load_shared_models(self):
-        """加载所有方法共享的模型，避免重复加载"""
+        """Load models shared by all methods to avoid redundant loading"""
         shared_models = {}
         
-        # 获取任意一个启用方法的配置（用于获取模型路径）
+        # Get config from any enabled method (to obtain model paths)
         method_configs = self.config['methods']
         enabled_methods = [k for k, v in method_configs.items() if v.get('enabled')]
         
         if not enabled_methods:
             return shared_models
         
-        # 从第一个启用的方法获取模型路径
+        # Get model paths from the first enabled method
         sample_config = None
         for method_name in enabled_methods:
             config = method_configs[method_name]
@@ -2367,7 +2367,7 @@ class BenchmarkFramework:
             print("  No methods with model paths found, skipping shared model loading")
             return shared_models
         
-        # 加载EEG模型
+        # Load EEG model
         print("  Loading shared EEG model...")
         from model.ATMS_retrieval import ATMS
         eeg_model = ATMS()
@@ -2381,7 +2381,7 @@ class BenchmarkFramework:
         eeg_model.eval()
         shared_models['eeg_model'] = eeg_model
         
-        # 加载Encoding模型
+        # Load encoding model
         print("  Loading shared encoding model...")
         from model.utils import load_model_encoder
         encoding_model = load_model_encoder(
@@ -2391,14 +2391,14 @@ class BenchmarkFramework:
         encoding_model.eval()
         shared_models['encoding_model'] = encoding_model
         
-        # 加载CLIP模型（如果PseudoModel启用）
+        # Load CLIP model (if PseudoModel is enabled)
         if 'pseudo_model' in enabled_methods:
             print("  Loading shared CLIP model...")
             from exp_batch_offline_generation import vlmodel, preprocess_train
             shared_models['vlmodel'] = vlmodel
             shared_models['preprocess_train'] = preprocess_train
         
-        # 🔥 重要：创建一个共享的SDXL pipeline供需要的方法使用
+        # Important: create a shared SDXL pipeline for methods that need it
         rl_methods = ['ddpo', 'dpok', 'd3po', 'bayesian_opt', 'cma_es']
         if any(m in enabled_methods for m in rl_methods):
             print("  Loading shared SDXL pipeline...")
@@ -2410,7 +2410,7 @@ class BenchmarkFramework:
         return shared_models
     
     def _create_shared_sdxl_pipeline(self, device):
-        """创建共享的SDXL pipeline"""
+        """Create a shared SDXL pipeline"""
         from diffusers import AutoencoderKL, DDIMScheduler, UNet2DConditionModel, StableDiffusionXLPipeline
         from safetensors.torch import load_file
         from huggingface_hub import hf_hub_download
@@ -2444,7 +2444,7 @@ class BenchmarkFramework:
         return pipe
         
     def _initialize_methods(self) -> Dict[str, BaseMethod]:
-        """初始化所有要对比的方法（使用共享模型）"""
+        """Initialize all methods to compare (using shared models)"""
         methods = {}
         
         method_configs = self.config['methods']
@@ -2456,7 +2456,7 @@ class BenchmarkFramework:
                 shared_models=self.shared_models
             )
         
-        # 🔥 新增: Heuristic Closed-Loop Pseudo Model
+        # Heuristic Closed-Loop Pseudo Model
         if method_configs.get('heuristic_closedloop', {}).get('enabled'):
             methods['HeuristicClosedLoop'] = HeuristicClosedLoopWrapper(
                 method_configs['heuristic_closedloop'], self.device,
@@ -2470,22 +2470,22 @@ class BenchmarkFramework:
                 shared_models=self.shared_models
             )
             
-        # DPOK (需要完整实现，这里跳过)
+        # DPOK (requires full implementation, skipped here)
         # if method_configs.get('dpok', {}).get('enabled'):
         #     methods['DPOK'] = DPOKWrapper(...)
             
-        # D3PO (需要完整实现，这里跳过)
+        # D3PO (requires full implementation, skipped here)
         # if method_configs.get('d3po', {}).get('enabled'):
         #     methods['D3PO'] = D3POWrapper(...)
         
-        # 🔥 新增: Bayesian Optimization
+        # Bayesian Optimization
         if method_configs.get('bayesian_opt', {}).get('enabled'):
             methods['BayesianOpt'] = BayesianOptimizationWrapper(
                 method_configs['bayesian_opt'], self.device,
                 shared_models=self.shared_models
             )
         
-        # 🔥 新增: CMA-ES
+        # CMA-ES
         if method_configs.get('cma_es', {}).get('enabled'):
             methods['CMA-ES'] = CMAESWrapper(
                 method_configs['cma_es'], self.device,
@@ -2496,10 +2496,10 @@ class BenchmarkFramework:
     
     def _load_targets(self) -> List[Dict]:
         """
-        随机采样target EEG特征（确保公平评测）
-        从整个图像池中随机抽取指定数量的targets
+        Randomly sample target EEG features (to ensure fair evaluation).
+        Randomly draws a specified number of targets from the entire image pool.
         """
-        # 读取配置
+        # Read configuration
         target_config = self.config['target_selection']
         num_targets = target_config['num_targets']
         random_seed = target_config['random_seed']
@@ -2507,32 +2507,32 @@ class BenchmarkFramework:
         embed_dir = self.config['data']['embed_dir']
         image_dir = self.config['data']['image_dir']
         
-        # 获取所有可用的文件
+        # Get all available files
         embed_files = sorted([f for f in os.listdir(embed_dir) if f.endswith('_embed.pt')])
         image_files = sorted([f for f in os.listdir(image_dir) 
                              if f.lower().endswith(('.jpg', '.png', '.jpeg'))])
         
-        # 确保文件数量一致
+        # Ensure file counts match
         assert len(embed_files) == len(image_files), \
             f"Mismatch: {len(embed_files)} embeds vs {len(image_files)} images"
         
         total_available = len(embed_files)
         
-        # 检查请求的数量是否合理
+        # Check if requested number is reasonable
         if num_targets > total_available:
             print(f"  WARNING: Requested {num_targets} targets, but only {total_available} available")
             num_targets = total_available
         
-        # 🔥 随机采样target indices（使用固定seed确保可复现）
+        # Randomly sample target indices (using fixed seed for reproducibility)
         rng = np.random.RandomState(seed=random_seed)
         selected_indices = rng.choice(total_available, size=num_targets, replace=False)
-        selected_indices = np.sort(selected_indices)  # 排序便于查看（保持为numpy数组）
+        selected_indices = np.sort(selected_indices)  # Sort for readability (keep as numpy array)
         
         print(f"  Target Selection: Randomly sampled {num_targets} targets from {total_available} available")
         print(f"  Selected indices: {selected_indices.tolist()}")
         print(f"  Random seed: {random_seed}")
         
-        # 加载选中的targets
+        # Load selected targets
         targets = []
         for idx in selected_indices:
             targets.append({
@@ -2553,14 +2553,14 @@ class BenchmarkFramework:
         seed: int,
         budget: int
     ) -> BenchmarkResult:
-        """运行单次实验"""
+        """Run a single experiment"""
         
-        # 🔥 在每个实验前清理显存
+        # Clean up GPU memory before each experiment
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
         
-        # 设置随机种子
+        # Set random seed
         np.random.seed(seed)
         torch.manual_seed(seed)
         if torch.cuda.is_available():
@@ -2572,24 +2572,24 @@ class BenchmarkFramework:
         print(f"  Running {method.name} on target {target_idx} (seed={seed})...")
         
         try:
-            # 记录GPU内存
+            # Record GPU memory
             if torch.cuda.is_available():
                 torch.cuda.reset_peak_memory_stats()
                 initial_memory = torch.cuda.memory_allocated() / 1e9
                 print(f"    Initial GPU memory: {initial_memory:.2f} GB")
             
-            # 运行优化
+            # Run optimization
             result = method.optimize(target_eeg, target_idx, budget)
             
-            # 计算GPU内存峰值
+            # Compute peak GPU memory
             if torch.cuda.is_available():
                 peak_memory = torch.cuda.max_memory_allocated() / 1e9
                 gpu_memory = peak_memory - initial_memory
-                print(f"    Peak GPU memory: {peak_memory:.2f} GB (增量: {gpu_memory:.2f} GB)")
+                print(f"    Peak GPU memory: {peak_memory:.2f} GB (increment: {gpu_memory:.2f} GB)")
             else:
                 gpu_memory = 0.0
             
-            # 保存生成的图像
+            # Save generated images
             if result['best_image'] is not None:
                 save_dir = os.path.join(
                     self.output_dir, 'images', method.name, f"target_{target_idx}"
@@ -2599,7 +2599,7 @@ class BenchmarkFramework:
                     os.path.join(save_dir, f"seed_{seed}.png")
                 )
             
-            # 创建结果对象
+            # Create result object
             benchmark_result = BenchmarkResult(
                 method_name=method.name,
                 target_idx=target_idx,
@@ -2611,10 +2611,10 @@ class BenchmarkFramework:
                 success=True
             )
             
-            # 🔥 立即reset方法以释放显存
+            # Immediately reset method to release GPU memory
             method.reset()
             
-            # 清理显存
+            # Clean up GPU memory
             del result
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -2623,7 +2623,7 @@ class BenchmarkFramework:
         except Exception as e:
             import traceback
             print(f"    ERROR: {str(e)}")
-            # 打印完整的错误堆栈（用于调试）
+            # Print full error traceback (for debugging)
             if "CUDA out of memory" not in str(e):
                 traceback.print_exc()
             
@@ -2636,11 +2636,11 @@ class BenchmarkFramework:
                 error_message=str(e)
             )
             
-            # 🔥 即使出错也要reset方法并清理显存
+            # Reset method and clean up GPU memory even on error
             try:
                 method.reset()
             except:
-                pass  # reset失败也继续
+                pass  # Continue even if reset fails
             
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -2650,11 +2650,11 @@ class BenchmarkFramework:
     
     def experiment_1_single_target(self) -> List[BenchmarkResult]:
         """
-        实验1: 单目标重建对比
-        所有方法在相同budget下生成图像，比较效果
+        Experiment 1: Single-target reconstruction comparison.
+        All methods generate images under the same budget for comparison.
         """
         print("\n" + "="*60)
-        print("实验1: 单目标重建对比（6种方法）")
+        print("Experiment 1: Single-target reconstruction comparison (6 methods)")
         print("="*60)
         
         exp_config = self.config['experiments']['exp1']
@@ -2671,13 +2671,13 @@ class BenchmarkFramework:
                     )
                     all_results.append(result)
         
-        # 保存结果
+        # Save results
         self._save_results(all_results, "exp1_results.csv")
         
         return all_results
     
     def _save_results(self, results: List[BenchmarkResult], filename: str):
-        """保存结果到CSV"""
+        """Save results to CSV"""
         df = pd.DataFrame([r.to_dict() for r in results])
         output_path = os.path.join(self.output_dir, filename)
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -2685,14 +2685,14 @@ class BenchmarkFramework:
         print(f"\nResults saved to: {output_path}")
     
     def visualize_results(self, results: List[BenchmarkResult], output_prefix: str):
-        """可视化结果"""
+        """Visualize results"""
         df = pd.DataFrame([r.to_dict() for r in results if r.success])
         
         if len(df) == 0:
             print("No successful experiments to visualize!")
             return
         
-        # 汇总统计表
+        # Summary statistics table
         summary = df.groupby('method_name').agg({
             'eeg_similarity': ['mean', 'std', 'max'],
             'time_seconds': ['mean', 'std'],
@@ -2706,10 +2706,10 @@ class BenchmarkFramework:
         print(summary)
         print("="*120)
         
-        # 保存统计
+        # Save statistics
         summary.to_csv(os.path.join(self.output_dir, f'{output_prefix}_summary.csv'))
         
-        # 箱线图对比
+        # Box plot comparison
         plt.figure(figsize=(12, 6))
         sns.boxplot(data=df, x='method_name', y='eeg_similarity')
         plt.title('EEG Similarity Distribution Across 6 Methods')
@@ -2721,7 +2721,7 @@ class BenchmarkFramework:
         plt.close()
     
     def run_full_benchmark(self):
-        """运行完整的benchmark"""
+        """Run the full benchmark"""
         print("\n" + "="*80)
         print("Starting Full Benchmark (6 Methods)")
         print("="*80)
@@ -2738,7 +2738,7 @@ class BenchmarkFramework:
 
 
 def main():
-    """主函数"""
+    """Main function"""
     import argparse
     
     parser = argparse.ArgumentParser(description='Run Benchmark Experiments (6 Methods)')
@@ -2750,10 +2750,10 @@ def main():
     
     args = parser.parse_args()
     
-    # 创建benchmark框架
+    # Create benchmark framework
     framework = BenchmarkFramework(args.config)
     
-    # 运行实验
+    # Run experiments
     if args.exp == 'all':
         framework.run_full_benchmark()
     elif args.exp == 'exp1':

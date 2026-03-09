@@ -259,7 +259,7 @@ def get_eeg_features(eeg_model, eeg_signal, device, sub):
     eeg_model.to(device)
     eeg_signal = eeg_signal.to(device)
     subject_ids = torch.full((eeg_signal.size(0),), int(extract_id_from_string(sub)), dtype=torch.long).to(device)  
-    eeg_embeds = eeg_model(eeg_signal, subject_ids).float()  # 将EEG信号传入模型
+    eeg_embeds = eeg_model(eeg_signal, subject_ids).float()  # Pass EEG signal through the model
 
     return eeg_embeds
 
@@ -606,7 +606,7 @@ def main():
         save_dir ='/home/kyw/sub_model/sub-01/diffusion_cornet_s/pretrained_True/true_true'
         # '/home/kyw/sub_model/sub-08/diffusion_cornet_s/pretrained_True/true_gene'
         results_file = f"{save_dir}/{args.encoder_type}.csv" #if config['insubject'] else f'./outputs/{config["encoder_type"]}_cross_exclude_{sub}.csv'
-        # 提取文件的目录部分
+        # Extract the directory part of the file path
         
         results_dir = os.path.dirname(results_file)
         os.makedirs(results_dir, exist_ok=True)

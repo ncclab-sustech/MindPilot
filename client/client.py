@@ -24,7 +24,7 @@ url = 'http://10.20.97.33:45525'
 
 sio = socketio.Client() 
 
-# 建立连接
+# Establish connection
 # @sio.event
 # def connect():
 #     print('Connected to server')
@@ -34,7 +34,7 @@ sio = socketio.Client()
 def experiment_2_ready():
     view.display_text('Experiment is ready, please wait')
     time.sleep(4)
-    # # 向服务器发送开始实验的信号
+    # # Send start experiment signal to the server
     send_url = f'{url}/experiment_2'
     requests.post(send_url)
 
@@ -42,7 +42,7 @@ def experiment_2_ready():
 def experiment_1_ready():
     view.display_text('Experiment is ready, please wait')
     time.sleep(4)
-    # # 向服务器发送开始实验的信号
+    # # Send start experiment signal to the server
     send_url = f'{url}/experiment_1'
     requests.post(send_url)
 
@@ -50,7 +50,7 @@ def send_files_to_server(pre_eeg_path, url):
     files = []
     file_objects = []
 
-    # 遍历 pre_eeg_path 中的所有 .npy 文件，并发送
+    # Iterate through all .npy files in pre_eeg_path and send them
     try:
         for filename in os.listdir(pre_eeg_path):
             if filename.endswith('.npy'):
@@ -62,7 +62,7 @@ def send_files_to_server(pre_eeg_path, url):
         response = requests.post(url, files=files)
         print("Files sent successfully")
     finally:
-        # 确保所有文件在请求完成后被关闭
+        # Ensure all files are closed after the request completes
         for f in file_objects:
             f.close()
             
@@ -75,7 +75,7 @@ def image_for_rating(data):
     for idx, encoded_string in enumerate(images):
         image_data = base64.b64decode(encoded_string)
         image = Image.open(BytesIO(image_data))
-        # 保存图像到 client/data/instant_image 目录下
+        # Save image to client/data/instant_image directory
         image_save_path = os.path.join(instant_image_path, f'image_{idx}.png')
         os.makedirs(instant_image_path, exist_ok=True)
         image.save(image_save_path)
@@ -83,20 +83,20 @@ def image_for_rating(data):
         
     print('All images saved')
     
-    # 启动实验
+    # Start the experiment
     ratings = controller.start_rating(instant_image_path)
     
-    # 发送 ratings 到服务器
+    # Send ratings to the server
     send_url = f'{url}/rating_upload'
     headers = {'Content-Type': 'application/json'}
-    # 确保 ratings 是一个 JSON 数组
+    # Ensure ratings is a JSON array
     data = {
-        'ratings': list(map(float, ratings))  # 确保 ratings 是浮点数列表
+        'ratings': list(map(float, ratings))  # Ensure ratings is a list of floats
     }
-    response = requests.post(send_url, headers=headers, json=data)  # 使用 json 参数直接传递数据
+    response = requests.post(send_url, headers=headers, json=data)  # Pass data directly using the json parameter
     print('Ratings sent to server:', response.status_code, response.text)
 
-    # 删除 instant_image_path 中的所有文件
+    # Delete all files in instant_image_path
     shutil.rmtree(instant_image_path)
     
 @sio.event
@@ -105,7 +105,7 @@ def image_for_rating_and_eeg(data):
     os.makedirs(instant_eeg_path, exist_ok=True)
     os.makedirs(instant_image_path, exist_ok=True)
     os.makedirs(instant_eeg_path, exist_ok=True)
-    # 删除 instant_image_path 和 instant_eeg_path 中的所有文件
+    # Delete all files in instant_image_path and instant_eeg_path
     shutil.rmtree(instant_image_path)
     shutil.rmtree(instant_eeg_path)    
     print('Images received')
@@ -113,7 +113,7 @@ def image_for_rating_and_eeg(data):
     for idx, encoded_string in enumerate(images):
         image_data = base64.b64decode(encoded_string)
         image = Image.open(BytesIO(image_data))
-        # 保存图像到 client/data/instant_image 目录下
+        # Save image to client/data/instant_image directory
         image_save_path = os.path.join(instant_image_path, f'image_{idx}.png')
         os.makedirs(instant_image_path, exist_ok=True)
         image.save(image_save_path)
@@ -121,24 +121,24 @@ def image_for_rating_and_eeg(data):
     
     print('All images saved')
 
-    # 启动实验
+    # Start the experiment
     ratings = controller.start_collect_and_rating(instant_image_path, instant_eeg_path)
     
-    # 发送 ratings 到服务器
+    # Send ratings to the server
     send_url = f'{url}/rating_upload'
     headers = {'Content-Type': 'application/json'}
-    # 确保 ratings 是一个 JSON 数组
+    # Ensure ratings is a JSON array
     data = {
-        'ratings': list(map(float, ratings))  # 确保 ratings 是浮点数列表
+        'ratings': list(map(float, ratings))  # Ensure ratings is a list of floats
     }
-    response = requests.post(send_url, headers=headers, json=data)  # 使用 json 参数直接传递数据
+    response = requests.post(send_url, headers=headers, json=data)  # Pass data directly using the json parameter
     print('Ratings sent to server:', response.status_code, response.text)
     
-    # 发送 instant_eeg_path 中的所有 npy 文件到服务器
+    # Send all .npy files in instant_eeg_path to the server
     send_url = f'{url}/eeg_upload'
     send_files_to_server(instant_eeg_path, send_url)
     
-    # 删除 instant_image_path 中的所有文件
+    # Delete all files in instant_image_path
     shutil.rmtree(instant_image_path)
     
     
@@ -146,7 +146,7 @@ def image_for_rating_and_eeg(data):
 def image_for_collection(data):
     os.makedirs(instant_image_path, exist_ok=True)
     os.makedirs(instant_eeg_path, exist_ok=True)
-    # 删除 instant_image_path 和 instant_eeg_path 中的所有文件
+    # Delete all files in instant_image_path and instant_eeg_path
     shutil.rmtree(instant_image_path)
     shutil.rmtree(instant_eeg_path)    
     print('Images received')
@@ -154,7 +154,7 @@ def image_for_collection(data):
     for idx, encoded_string in enumerate(images):
         image_data = base64.b64decode(encoded_string)
         image = Image.open(BytesIO(image_data))
-        # 保存图像到 client/data/instant_image 目录下
+        # Save image to client/data/instant_image directory
         image_save_path = os.path.join(instant_image_path, f'image_{idx}.png')
         os.makedirs(instant_image_path, exist_ok=True)
         image.save(image_save_path)
@@ -162,10 +162,10 @@ def image_for_collection(data):
     
     print('All images saved')
 
-    # 启动实验
+    # Start the experiment
     controller.start_collection(instant_image_path, instant_eeg_path)
     
-    # 发送 instant_eeg_path 中的所有 npy 文件到服务器
+    # Send all .npy files in instant_eeg_path to the server
     send_url = f'{url}/instant_eeg_upload'
     send_files_to_server(instant_eeg_path, send_url)
 
@@ -175,7 +175,7 @@ def experiment_finished(data):
     print(data['message'])
     if use_eeg:
         controller.stop_collection()
-    # 断开连接
+    # Disconnect
     sio.disconnect()
     quit
 
@@ -197,7 +197,7 @@ if __name__ == '__main__':
 
     controller.run()
 
-    # 等待以保持连接
+    # Wait to keep the connection alive
     try:
         sio.wait()
     except KeyboardInterrupt:

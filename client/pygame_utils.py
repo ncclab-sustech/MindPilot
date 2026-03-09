@@ -34,7 +34,7 @@ class EEGModel:
             print("Data collection started.")
 
     def trigger(self, label):
-        code = int(label)  # 直接将传入的类别编号转换为整数
+        code = int(label)  # Directly convert the passed-in category number to an integer
         print(f'Sending trigger for label {label}: {code}')
         self.triggerbox.output_event_data(code)
 
@@ -46,7 +46,7 @@ class EEGModel:
         original_data_path = os.path.join(pre_eeg_path, f'original\{time.strftime("%Y%m%d-%H%M%S")}.npy')
         preprocess_data_path = os.path.join(pre_eeg_path, f'preprocessed\{time.strftime("%Y%m%d-%H%M%S")}.npy')
         
-        # 确保目录存在
+        # Ensure the directory exists
         os.makedirs(os.path.dirname(original_data_path), exist_ok=True)
         os.makedirs(os.path.dirname(preprocess_data_path), exist_ok=True)
 
@@ -54,35 +54,35 @@ class EEGModel:
         np.save(original_data_path, data)
         print("Pre-experiment data saved!")
 
-        # 进行数据预处理
+        # Perform data preprocessing
         filters = prepare_filters(fs = self.sample_rate, new_fs=250)
         real_time_processing(original_data_path, preprocess_data_path, filters)
         print("Pre-experiment data preprocessed!")
 
-        # 数据 event-based 处理
+        # Event-based data processing
         create_event_based_npy(original_data_path, preprocess_data_path, pre_eeg_path)
         
     def save_labels(self, labels, path):
         labels_path = os.path.join(path, 'labels.npy')
-        # 确保目录存在
+        # Ensure the directory exists
         os.makedirs(os.path.dirname(labels_path), exist_ok=True)
-        # 保存标签
+        # Save labels
         np.save(labels_path, labels)
         print("Labels saved!")
 
     def save_instant_eeg(self, instant_eeg_path):
         data = self.thread_data_server.GetBufferData()
         event_data_list = create_last_event_npy(data, 1)
-        event_data = event_data_list[0]  # 取第一个事件数据
+        event_data = event_data_list[0]  # Take the first event data
         filters = prepare_filters(fs = self.sample_rate, new_fs=250)
         data = real_time_process(event_data, filters)
         np.save(os.path.join(instant_eeg_path, f'{time.strftime("%Y%m%d-%H%M%S")}.npy'), data)
         print("Instant EEG data saved!")
         
     def save_eeg(self, instant_eeg_path, file_name):
-        # 确保目录存在
+        # Ensure the directory exists
         os.makedirs(instant_eeg_path, exist_ok=True)
-        # 保存数据
+        # Save data
         data = self.thread_data_server.GetBufferData()
         np.save(os.path.join(instant_eeg_path, f'{file_name}.npy'), data)
         print("Instant EEG data saved!")
@@ -93,19 +93,19 @@ class EEGModel:
         return event_data_list
     
     def get_next_sequence(self):
-        # 确保不会超出列表范围
+        # Ensure we don't exceed the list bounds
         if self.current_sequence * self.num_per_event >= len(self.sequence_indices):
             raise Exception("All sequences have been displayed.")
 
-        # 从打乱的索引列表中获取下一个序列的索引
+        # Get the next sequence indices from the shuffled index list
         sequence_start_index = self.current_sequence * self.num_per_event
         sequence_end_index = sequence_start_index + self.num_per_event
         next_sequence_indices = self.sequence_indices[sequence_start_index:sequence_end_index]
 
-        # 更新当前序列计数
+        # Update the current sequence counter
         self.current_sequence += 1
 
-        # 返回选中的图像和标签，即返回 20 个 images_with_labels 元组
+        # Return the selected images and labels, i.e. 20 (image, label) tuples
         return [(self.images[i], i) for i in next_sequence_indices]
 
     def reset_sequence(self):
@@ -121,11 +121,11 @@ class BaseController:
         self.running = True
         
     def process_events(self):
-        """处理所有排队的事件，提高响应性能"""
+        """Process all queued events to improve responsiveness."""
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 self.running = False
-            # 将键盘事件传递给视图进行处理
+            # Pass keyboard events to the view for handling
             if hasattr(self.view, 'handle_event'):
                 self.view.handle_event(event)
         return self.running
@@ -137,22 +137,22 @@ class BaseController:
         while self.running:
             self.running = self.process_events()
             
-            clock.tick(60)  # 控制帧率
+            clock.tick(60)  # Control frame rate
 
     def start_rating(self, instant_image_path):
         print("Start rating")
         self.view.display_text('Ready to start rating')
         
-        # 获取所有图片文件
+        # Get all image files
         all_image_files = [f for f in os.listdir(instant_image_path) if f.endswith('.jpg') or f.endswith('.png')]
         
-        # 初始化标签列表
+        # Initialize ratings list
         ratings = []
         
-        # 显示图片并采集数据
+        # Display images and collect data
         for image_file in all_image_files:
             image_path = os.path.join(instant_image_path, image_file)
-            print(f"显示图片: {image_path}")
+            print(f"Displaying image: {image_path}")
             
             image = pg.image.load(image_path)
             self.view.display_image(image)
@@ -162,9 +162,9 @@ class BaseController:
                 pg.time.delay(10)             
             score = self.view.rating()
             if score is None:
-                score = 0.5  # 默认评分
+                score = 0.5  # Default rating
             ratings.append(score)
-            print(f"评分: {score}")
+            print(f"Rating: {score}")
         return ratings
 
     def end_experiment(self):
@@ -183,11 +183,11 @@ class EEGController:
         self.model.start_data_collection()
         
     def process_events(self):
-        """处理所有排队的事件，提高响应性能"""
+        """Process all queued events to improve responsiveness."""
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 self.running = False
-            # 将键盘事件传递给视图进行处理
+            # Pass keyboard events to the view for handling
             if hasattr(self.view, 'handle_event'):
                 self.view.handle_event(event)
         return self.running
@@ -199,25 +199,25 @@ class EEGController:
         while self.running:
             self.running = self.process_events()
             
-            clock.tick(60)  # 控制帧率
+            clock.tick(60)  # Control frame rate
             
     
     def start_collect_and_rating(self, instant_image_path, instant_eeg_path):
         print("Start rating")
         self.view.display_text('Ready to start rating')
         
-        # 获取所有图片文件
+        # Get all image files
         all_image_files = [f for f in os.listdir(instant_image_path) if f.endswith('.jpg') or f.endswith('.png')]
         
-        # 初始化标签列表
+        # Initialize ratings list
         ratings = []
         count = 0
         
-        # 显示图片并采集数据
+        # Display images and collect data
         for image_file in all_image_files:
             count+= 1
             image_path = os.path.join(instant_image_path, image_file)
-            print(f"显示图片: {image_path}")
+            print(f"Displaying image: {image_path}")
             
             image = pg.image.load(image_path)
             self.view.display_image(image)
@@ -228,9 +228,9 @@ class EEGController:
                 pg.time.delay(10)             
             score = self.view.rating()
             if score is None:
-                score = 0.5  # 默认评分
+                score = 0.5  # Default rating
             ratings.append(score)
-            print(f"评分: {score}")
+            print(f"Rating: {score}")
         self.model.save_eeg(instant_eeg_path, '1')
         return ratings
     
@@ -252,26 +252,26 @@ class View:
     def __init__(self):
         pg.init()
         
-        # 创建固定尺寸的窗口 1920x1080
+        # Create a fixed-size window 1920x1080
         screen_width, screen_height = 1920, 1080
         self.screen = pg.display.set_mode((screen_width, screen_height))
         pg.display.set_caption('Closed Loop Experiment')
         self.font = pg.font.Font(None, 40)
         
-        # 存储窗口信息
+        # Store window information
         self.screen_width = screen_width
         self.screen_height = screen_height
         
-        # 对于输入相关的状态变量
+        # State variables for input handling
         self.input_active = False
         self.input_text = ""
         self.input_rect = pg.Rect(screen_width//2 - 100, screen_height//2, 200, 50)
         self.input_result = None
         
-        print(f"已创建 {screen_width}x{screen_height} 窗口")
+        print(f"Created {screen_width}x{screen_height} window")
         
     def handle_event(self, event):
-        """处理事件，提高键盘响应性能"""
+        """Handle events to improve keyboard responsiveness."""
         if not self.input_active:
             return
             
@@ -290,14 +290,14 @@ class View:
                 self.input_active = False
                 self.input_result = None
             elif event.unicode in '0123456789.' and len(self.input_text) < 4:
-                # 确保只有一个小数点和小数点后最多两位
+                # Ensure only one decimal point and at most two decimal places
                 if event.unicode == '.' and '.' in self.input_text:
                     return
                 if '.' in self.input_text and len(self.input_text.split('.')[1]) >= 2 and event.unicode != '.':
                     return
                 self.input_text += event.unicode
                 
-            # 实时更新显示
+            # Update display in real time
             self.update_rating_display()
         
     def display_text(self, text):
@@ -308,46 +308,46 @@ class View:
         pg.display.flip()     
 
     def display_fixation(self):
-        self.screen.fill((0, 0, 0))  # 清屏
-        # 绘制红色圆
+        self.screen.fill((0, 0, 0))  # Clear screen
+        # Draw red circle
         pg.draw.circle(self.screen, (200, 0, 0), (400,300), 10, 0)
-        # 绘制黑色十字
+        # Draw black cross
         pg.draw.line(self.screen, (0, 0, 0), (425, 300), (375, 300), 3)
         pg.draw.line(self.screen, (0, 0, 0), (400, 325), (400, 275), 3)
         pg.display.flip()
 
     def display_image(self, image):
-        # 获取当前屏幕分辨率
+        # Get current screen resolution
         screen_width, screen_height = self.screen.get_size()
         
-        # 获取图片的原始尺寸
+        # Get the original image dimensions
         img_width, img_height = image.get_size()
         
-        # 计算宽高比
+        # Calculate aspect ratios
         width_ratio = screen_width / img_width
         height_ratio = screen_height / img_height
         
-        # 选择较小的比例以确保图片完全显示在屏幕内
+        # Choose the smaller ratio to ensure the image fits entirely on screen
         scale_ratio = min(width_ratio, height_ratio)
         
-        # 计算缩放后的尺寸
+        # Calculate scaled dimensions
         new_width = int(img_width * scale_ratio)
         new_height = int(img_height * scale_ratio)
         
-        # 缩放图片
+        # Scale the image
         scaled_image = pg.transform.scale(image, (new_width, new_height))
         
-        # 计算居中位置
+        # Calculate centered position
         x_pos = (screen_width - new_width) // 2
         y_pos = (screen_height - new_height) // 2
         
-        # 先填充黑色背景
+        # Fill with black background first
         self.screen.fill((0, 0, 0))
         
-        # 在居中位置绘制图片
+        # Draw the image at the centered position
         self.screen.blit(scaled_image, (x_pos, y_pos))
         
-        # 更新屏幕显示
+        # Update screen display
         pg.display.flip()
 
     def clear_screen(self):
@@ -356,18 +356,18 @@ class View:
 
     def display_multiline_text(self, text, position, font_size, line_spacing):
         font = pg.font.Font(self.font_path, font_size)
-        lines = text.splitlines()  # 分割文本为多行
+        lines = text.splitlines()  # Split text into multiple lines
         x, y = position
 
         for line in lines:
             line_surface = font.render(line, True, (255, 255, 255))
             self.screen.blit(line_surface, (x, y))
-            y += line_surface.get_height() + line_spacing  # 更新y坐标，为下一行做准备
+            y += line_surface.get_height() + line_spacing  # Update y coordinate for the next line
 
-        pg.display.flip()  # 更新屏幕显示
+        pg.display.flip()  # Update screen display
         
     def handle_event(self, event):
-        """处理事件，提高键盘响应性能"""
+        """Handle events to improve keyboard responsiveness."""
         if not self.input_active:
             return
             
@@ -386,58 +386,58 @@ class View:
                 self.input_active = False
                 self.input_result = None
             elif event.unicode in '0123456789.' and len(self.input_text) < 4:
-                # 确保只有一个小数点和小数点后最多两位
+                # Ensure only one decimal point and at most two decimal places
                 if event.unicode == '.' and '.' in self.input_text:
                     return
                 if '.' in self.input_text and len(self.input_text.split('.')[1]) >= 2 and event.unicode != '.':
                     return
                 self.input_text += event.unicode
                 
-            # 实时更新显示
+            # Update display in real time
             self.update_rating_display()
             
     def update_rating_display(self):
-        """更新评分界面显示"""
+        """Update the rating interface display."""
         if not self.input_active:
             return
             
-        # 清屏
+        # Clear screen
         self.screen.fill((0, 0, 0))
         
-        # 绘制说明文本
+        # Draw instruction text
         instruction_text = self.font.render("Input the rating of the image:(0.00-1.00)", True, (255, 255, 255))
         self.screen.blit(instruction_text, (self.screen_width//2 - instruction_text.get_width()//2, 
                                             self.screen_height//2 - 80))
         
-        # 绘制输入框
+        # Draw input box
         pg.draw.rect(self.screen, (255, 255, 255), self.input_rect, 2)
         
-        # 显示当前输入的文本
+        # Display current input text
         text_surface = self.font.render(self.input_text, True, (255, 255, 255))
         self.screen.blit(text_surface, (self.input_rect.x + 10, self.input_rect.y + 10))
         
-        # 显示用法提示
+        # Display usage hint
         hint_text = self.font.render("Enter or ESC", True, (200, 200, 200))
         self.screen.blit(hint_text, (self.screen_width//2 - hint_text.get_width()//2, 
                                         self.screen_height//2 + 80))
         
-        # 更新显示
+        # Update display
         pg.display.flip()
         
     def rating(self):
-        """显示评分界面，让用户输入0-1之间的两位小数"""
-        print("正在显示打分")
+        """Display the rating interface for the user to input a decimal between 0 and 1."""
+        print("Displaying rating interface")
         
         self.input_active = True
         self.input_text = ""
         self.input_result = None
         
-        # 初始显示
+        # Initial display
         self.update_rating_display()
         
-        # 等待用户完成输入
+        # Wait for user to complete input
         while self.input_active:
-            pg.time.delay(10)  # 短暂延迟，降低CPU使用率
-            # 事件处理由Controller中的process_events调用handle_event函数完成
+            pg.time.delay(10)  # Brief delay to reduce CPU usage
+            # Event handling is done by Controller's process_events calling handle_event
         
         return self.input_result

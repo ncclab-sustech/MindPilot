@@ -38,13 +38,13 @@ def load_vlmodel(model_name='ViT-H-14', model_weights_path=None, precision='fp32
 #     return test_images_path, labels
 
 def get_image_pool(image_set_path, cache_file='image_paths_cache.pkl'):
-    # 检查是否有缓存文件
+    # Check if a cache file exists
     if os.path.exists(cache_file):
         print(f"Loading cached image paths from {cache_file}")
         with open(cache_file, 'rb') as f:
             return pickle.load(f)
     
-    # 如果没有缓存，则扫描目录
+    # If no cache exists, scan the directory
     test_images_path = []
     labels = []
     for sub_test_image in sorted(os.listdir(image_set_path)):
@@ -59,7 +59,7 @@ def get_image_pool(image_set_path, cache_file='image_paths_cache.pkl'):
             image_path = os.path.join(sub_image_path, image)
             test_images_path.append(image_path)
     
-    # 保存结果到缓存文件
+    # Save results to cache file
     with open(cache_file, 'wb') as f:
         pickle.dump((test_images_path, labels), f)
     
