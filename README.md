@@ -17,7 +17,7 @@
 ## 📰 News
 
 - 🚀 **2026.03.08**: We update the codebase and [Hugging Face](https://huggingface.co/datasets/LidongYang/Mindpilot) resources.
-- 📄 **2026.02.11**: We update the [arXiv](https://arxiv.org/abs/2602.10552) paper and release the code repository.
+- 📄 **2026.02.11**: We upload the [arXiv](https://arxiv.org/abs/2602.10552) paper and release the [code repository](https://github.com/ncclab-sustech/MindPilot).
 - 🎉 **2026.01.26**: Our paper is accepted to [ICLR 2026](https://openreview.net/forum?id=7jdmXx869Q).
 
 ## 📖 Overview
@@ -188,13 +188,12 @@ If you find this work useful, please cite our paper:
   pages={102822--102864},
   year={2024}
 }
-@inproceedings{
-2026mindpilot,
-title={MindPilot: Closed-loop Visual Stimulation Optimization for Brain Modulation with {EEG}-guided Diffusion},
-author={Dongyang Li, Kunpeng Xie, Mingyang Wu, Yiwei Kong, Jiahua Tang, Haoyang Qin, Chen Wei, Quanying Liu },
-booktitle={The Fourteenth International Conference on Learning Representations},
-year={2026},
-url={https://openreview.net/forum?id=7jdmXx869Q}
+@inproceedings{2026mindpilot,
+  title={MindPilot: Closed-loop Visual Stimulation Optimization for Brain Modulation with {EEG}-guided Diffusion},
+  author={Dongyang Li, Kunpeng Xie, Mingyang Wu, Yiwei Kong, Jiahua Tang, Haoyang Qin, Chen Wei, Quanying Liu },
+  booktitle={The Fourteenth International Conference on Learning Representations},
+  year={2026},
+  url={https://openreview.net/forum?id=7jdmXx869Q}
 }
 ```
 
@@ -209,7 +208,7 @@ We sincerely thank the following works and their authors for providing valuable 
 - [DPOK](https://github.com/google-research/google-research/tree/master/dpok) — *"[Reinforcement Learning for Fine-tuning Text-to-Image Diffusion Models](https://arxiv.org/abs/2305.16381)"* by Ying Fan, Olivia Watkins, Yuqing Du, Hao Liu, Moonkyung Ryu, Craig Boutilier, Pieter Abbeel, Mohammad Ghavamzadeh, Kangwook Lee, Kimin Lee.
 
 📬 Contact [Dongyang Li](https://dongyangli-del.github.io/) if you have any questions or suggestions.
-Kevin Black, Michael Janner, Yilun Du, Ilya Kostrikov, Sergey Levine.
+
 ## 📜 License
 
 This project is licensed under the [MIT License](LICENSE).
