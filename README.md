@@ -8,11 +8,17 @@
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.5.0-red.svg)](https://pytorch.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Dataset](https://img.shields.io/badge/🤗%20Dataset-MindPilot-yellow.svg)](https://huggingface.co/datasets/LidongYang/Mindpilot)
+[![Dataset](https://img.shields.io/badge/🤗%20Checkpoints-MindPilot-yellow.svg)](https://huggingface.co/datasets/LidongYang/Mindpilot)
 
 ---
 
 </div>
+
+## 📰 News
+
+- 🚀 **2025.03.08**: We update the codebase and [Hugging Face](https://huggingface.co/datasets/LidongYang/Mindpilot) resources.
+- 📄 **2025.02.11**: We update the [arXiv](https://arxiv.org/abs/2602.10552) paper and release the code repository.
+- 🎉 **2025.01.26**: Our paper is accepted to [ICLR 2026](https://openreview.net/forum?id=7jdmXx869Q).
 
 ## 📖 Overview
 
@@ -46,7 +52,7 @@ We propose **MindPilot**, which employs a simple black-box optimization approach
 <img src="fig-framework.png" alt="Framework" width="90%"/>
 <p><i>Overall architecture of MindPilot framework</i></p>
 </div>
----
+
 
 
 ### Installation
