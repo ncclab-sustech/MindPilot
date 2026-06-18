@@ -11,7 +11,7 @@ from model.utils import preprocess_image, generate_eeg
 import pickle
 def load_vlmodel(model_name='ViT-H-14', model_weights_path=None, precision='fp32', device=None):
     if device is None:
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     vlmodel, preprocess_train, feature_extractor = open_clip.create_model_and_transforms(
         model_name=model_name, pretrained=None, precision=precision, device=device
     )

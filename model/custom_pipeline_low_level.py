@@ -570,20 +570,12 @@ def encode_image(image, image_encoder, feature_extractor, num_images_per_prompt=
 class Generator4Embeds:
 
     def __init__(self, num_inference_steps=1, device='cuda', img2img_strength=1, low_level_image=None, low_level_latent = None) -> None:
-        # import os    
-        # proxy = 'http://10.16.118.59:13390'
-        # os.environ['http_proxy'] = proxy
-        # os.environ['https_proxy'] = proxy
-
         self.num_inference_steps = num_inference_steps
         self.dtype = torch.bfloat16
         self.device = device
         self.img2img_strength = img2img_strength
         self.low_level_image = low_level_image
         self.low_level_latent = low_level_latent
-        # path = '/home/weichen/.cache/huggingface/hub/models--stabilityai--sdxl-turbo/snapshots/f4b0486b498f84668e828044de1d0c8ba486e05b'
-        # path = "/home/ldy/Workspace/sdxl-turbo/f4b0486b498f84668e828044de1d0c8ba486e05b"
-        # pipe = DiffusionPipeline.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.bfloat16, variant="fp16")
         from extended_diffusers import ExtendedStableDiffusionXLPipeline
         from safetensors.torch import load_file
         from diffusers import AutoencoderKL, DDIMScheduler, UNet2DConditionModel
@@ -626,15 +618,9 @@ class Generator4Embeds:
 
 if __name__ == "__main__":
     import os
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-
-    # import os
-    # os.environ['http_proxy'] = 'http://10.16.35.10:13390' 
-    # os.environ['https_proxy'] = 'http://10.16.35.10:13390' 
-    # # path = '/home/weichen/.cache/huggingface/hub/models--stabilityai--sdxl-turbo/snapshots/f4b0486b498f84668e828044de1d0c8ba486e05b'
+    demo_device = os.environ.get("MINDPILOT_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
 
     # pipe = DiffusionPipeline.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.bfloat16, variant="fp16")
-    # # pipe = DiffusionPipeline.from_pretrained(path, torch_dtype=torch.bfloat16, variant="fp16")
     # pipe.to("cuda")
 
     # from IPython.display import Image, display
@@ -669,10 +655,6 @@ if __name__ == "__main__":
     #     torch_dtype=torch.bfloat16,
     # ).to("cuda")
     # feature_extractor = CLIPImageProcessor()
-
-    # from diffusers.utils import load_image
-    # image_prompt = load_image("/mnt/dataset0/weichen/projects/visobj/proposals/mise/data/things-images/THINGSplus/images/images_resized/apple.jpg")
-    # display(image_prompt)
 
     # # encode image
     # image_embeds = encode_image(image_prompt, image_encoder, feature_extractor, 1, "cuda")
@@ -715,17 +697,22 @@ if __name__ == "__main__":
     # 2.2 Load image encoder from open_clip
     import open_clip
     image_encoder, _, feature_extractor = open_clip.create_model_and_transforms(
-        'ViT-H-14', pretrained='laion2b_s32b_b79k', precision='fp16', device='cuda')
+        'ViT-H-14', pretrained='laion2b_s32b_b79k', precision='fp16', device=demo_device)
 
     from diffusers.utils import load_image
-    image_prompt = load_image("/mnt/dataset0/weichen/projects/visobj/proposals/mise/data/things-images/THINGSplus/images/images_resized/apple.jpg")
-    # image_prompt = load_image("https://th.bing.com/th/id/OIP.BGo1V-YM46ZrqSo5N_edWAHaE7?rs=1&pid=ImgDetMain")
+    image_prompt_path = os.environ.get(
+        "MINDPILOT_DEMO_IMAGE",
+        "https://th.bing.com/th/id/OIP.BGo1V-YM46ZrqSo5N_edWAHaE7?rs=1&pid=ImgDetMain",
+    )
+    image_prompt = load_image(image_prompt_path)
 
     display(image_prompt)
 
     # encode image
     # image_embeds = encode_image(image_prompt, image_encoder, feature_extractor, 1, "cuda")
-    image_embeds = image_encoder.encode_image(feature_extractor(image_prompt)[None, ...].to("cuda", dtype=torch.bfloat16))
+    image_embeds = image_encoder.encode_image(
+        feature_extractor(image_prompt)[None, ...].to(demo_device, dtype=torch.bfloat16)
+    )
 
     image = generator.generate(image_embeds)
     display(image)

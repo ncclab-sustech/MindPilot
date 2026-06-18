@@ -1,10 +1,10 @@
 {
   "device": "cuda",
-  "output_dir": "/home/ldy/Workspace/Closed_loop_optimizing/benchmark_results_total",
+  "output_dir": "outputs/benchmark_results_total",
   
   "data": {
-    "embed_dir": "/home/ldy/Workspace/Closed_loop_optimizing/data/clip_embed/2025-09-21",
-    "image_dir": "/home/ldy/Workspace/Closed_loop_optimizing/test_images"
+    "embed_dir": "data/clip_embed",
+    "image_dir": "test_images"
   },
   
   "target_selection": {
@@ -16,18 +16,18 @@
   "methods": {
     "pseudo_model": {
       "enabled": true,
-      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
-      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
-      "image_dir": "/home/ldy/Workspace/Closed_loop_optimizing/test_images",
+      "eeg_model_path": "checkpoints/eeg_encoder/sub-01/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "checkpoints/encoding/sub-01/alexnet/model_state_dict.pt",
+      "image_dir": "test_images",
       "subject": "sub-01",
       "comment": "Pseudo Model with offline optimization"
     },
     
     "heuristic_closedloop": {
       "enabled": true,
-      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
-      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
-      "image_dir": "/home/ldy/Workspace/Closed_loop_optimizing/test_images",
+      "eeg_model_path": "checkpoints/eeg_encoder/sub-01/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "checkpoints/encoding/sub-01/alexnet/model_state_dict.pt",
+      "image_dir": "test_images",
       "subject": "sub-01",
       "num_fusions_per_round": 2,
       "top_k_greedy": 20,
@@ -37,8 +37,8 @@
     
     "ddpo": {
       "enabled": false,
-      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
-      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "eeg_model_path": "checkpoints/eeg_encoder/sub-01/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "checkpoints/encoding/sub-01/alexnet/model_state_dict.pt",
       "subject": "sub-01",
       "n_epochs": 1,
       "batch_size": 2,
@@ -51,8 +51,8 @@
     
     "dpok": {
       "enabled": false,
-      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
-      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "eeg_model_path": "checkpoints/eeg_encoder/sub-01/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "checkpoints/encoding/sub-01/alexnet/model_state_dict.pt",
       "subject": "sub-01",
       "n_epochs": 1,
       "batch_size": 2,
@@ -64,8 +64,8 @@
     
     "d3po": {
       "enabled": false,
-      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
-      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "eeg_model_path": "checkpoints/eeg_encoder/sub-01/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "checkpoints/encoding/sub-01/alexnet/model_state_dict.pt",
       "subject": "sub-01",
       "n_epochs": 1,
       "batch_size": 2,
@@ -78,8 +78,8 @@
     
     "bayesian_opt": {
       "enabled": true,
-      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
-      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "eeg_model_path": "checkpoints/eeg_encoder/sub-01/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "checkpoints/encoding/sub-01/alexnet/model_state_dict.pt",
       "subject": "sub-01",
       "acquisition": "ucb",
       "kappa": 2.5,
@@ -90,8 +90,8 @@
     
     "cma_es": {
       "enabled": true,
-      "eeg_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth",
-      "encoding_model_path": "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/sub-01/synthetic_eeg_data/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt",
+      "eeg_model_path": "checkpoints/eeg_encoder/sub-01/ATM_S_reconstruction_scale_0_1000_40.pth",
+      "encoding_model_path": "checkpoints/encoding/sub-01/alexnet/model_state_dict.pt",
       "subject": "sub-01",
       "population_size": 8,
       "sigma": 0.5,
@@ -123,4 +123,3 @@
     "dpi": 300
   }
 }
-

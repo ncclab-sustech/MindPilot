@@ -32,6 +32,7 @@ import time
 import shutil
 from threading import Event
 import io
+from pathlib import Path
 
 
 import matplotlib.pyplot as plt
@@ -51,12 +52,31 @@ from modulation_utils import *  # Wildcard import, includes various image proces
 from server_utils import *  # Wildcard import, includes server utility functions
 
 
-proxy = 'http://10.32.204.163:7897'
-os.environ['http_proxy'] = proxy
-os.environ['https_proxy'] = proxy
-# Set Hugging Face mirror address
-# os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-os.environ["CUDA_VISIBLE_DEVICES"] = "5" 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def resolve_path(path_like):
+    path = Path(path_like).expanduser()
+    if path.is_absolute():
+        return path
+    return REPO_ROOT / path
+
+
+def env_path(name, default):
+    return str(resolve_path(os.environ.get(name, default)))
+
+
+def env_bool(name, default):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.lower() in {"1", "true", "yes", "y", "on"}
+
+
+proxy = os.environ.get("MINDPILOT_PROXY")
+if proxy:
+    os.environ["http_proxy"] = proxy
+    os.environ["https_proxy"] = proxy
 
 # Initialize Flask app and Socket.IO
 app = Flask(__name__)
@@ -64,19 +84,21 @@ socketio = SocketIO(app, cors_allowed_origins="*")  # Allow cross-origin request
 
 #====================== Global Experiment Parameters ======================
 # Basic experiment settings
-feature_type = 'clip'      # Feature type: 'clip', 'psd', 'clip_img'
-# output_save_path = '/home/ldy/Closed_loop_optimizing/server/outputs/shenyuyang_male_2/rating'  # Experiment results save path
-output_save_path = f'/home/ldy/Closed_loop_optimizing/server/outputs/shenyuyang_male_2/{feature_type}'  # Experiment results save path
-sub = 'sub-01'                # Subject ID
-subject_id = 1                # Numeric subject ID
-fs = 250                      # EEG sampling frequency (Hz)
-num_loops = 10                # Number of experiment loops
-use_eeg = True            # Whether to use EEG data
-device = "cuda" if torch.cuda.is_available() else "cpu"  # Compute device
-model_type = 'ViT-H-14'        # CLIP model type
-dnn = 'alexnet'                # DNN model type
-random.seed(30)           # Random seed
-is_post = False         # Whether this is a follow-up to experiment 2
+feature_type = os.environ.get("MINDPILOT_FEATURE_TYPE", "clip")  # clip, psd, clip_img
+output_save_path = env_path(
+    "MINDPILOT_OUTPUT_DIR", Path("server") / "outputs" / feature_type
+)
+sub = os.environ.get("MINDPILOT_SUBJECT", "sub-01")
+subject_id = int(os.environ.get("MINDPILOT_SUBJECT_ID", "1"))
+fs = int(os.environ.get("MINDPILOT_FS", "250"))
+num_loops = int(os.environ.get("MINDPILOT_NUM_LOOPS", "10"))
+use_eeg = env_bool("MINDPILOT_USE_EEG", True)
+device = os.environ.get("MINDPILOT_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
+model_type = os.environ.get("MINDPILOT_CLIP_MODEL", "ViT-H-14")
+dnn = os.environ.get("MINDPILOT_DNN", "alexnet")
+random_seed = int(os.environ.get("MINDPILOT_RANDOM_SEED", "30"))
+random.seed(random_seed)
+is_post = env_bool("MINDPILOT_IS_POST", False)
 
 # Data collection containers
 processed_paths = set()       # Set of already processed image paths
@@ -94,20 +116,26 @@ fit_rewards = []              # Reward values for fitting
 fit_losses = []               # Loss values for fitting
 
 
-# Pre-loaded test set embeddings
-test_set_img_embeds = torch.load("/mnt/dataset1/ldy/Workspace/FLORA/data_preparing/ViT-H-14_features_test.pt")['img_features'].cpu()
+# Pre-loaded test set embeddings. Required by the greedy image-selection stage.
+test_set_img_embeds_path = env_path(
+    "MINDPILOT_TEST_IMG_EMBEDS",
+    Path("data") / "clip_features" / f"{model_type}_features_test.pt",
+)
+if os.path.isfile(test_set_img_embeds_path):
+    test_set_img_embeds = torch.load(test_set_img_embeds_path, map_location="cpu")["img_features"].cpu()
+else:
+    test_set_img_embeds = None
 
 #====================== Path Parameters ======================
 # Image and data paths
-# image_set_path = 'image_pool_square'  # Image set path
-image_set_path = 'test_images'
+image_set_path = env_path("MINDPILOT_IMAGE_SET_DIR", "test_images")
 
-instant_eeg_path = 'server/data/instant_eeg'                                           # Real-time EEG data storage path
-cache_path = 'server/data/cache'           
+instant_eeg_path = env_path("MINDPILOT_INSTANT_EEG_DIR", Path("server") / "data" / "instant_eeg")
+cache_path = env_path("MINDPILOT_CACHE_DIR", Path("server") / "data" / "cache")
 
-# target_image_path = 'image_pool_square/square_Dis-07.jpg' 
-# target_image_path = 'test_images/00014_bike_bike_22s.jpg'
-target_image_path = 'test_images/00131_pear_pear_01b.jpg'
+target_image_path = env_path(
+    "MINDPILOT_TARGET_IMAGE", Path(image_set_path) / "00131_pear_pear_01b.jpg"
+)
 
     
 target_eeg_path = ''                                # Target EEG data path
@@ -140,9 +168,16 @@ if use_eeg:
         
     elif feature_type == 'clip':
         # Load CLIP-encoded EEG embeddings
-        # target_eeg_embed = "/mnt/dataset0/xkp/closed-loop/server/target_embed/open_clip/00014_bike_eeg_embeds.pt"
         # Load EEG encoder model
-        f_encoder = f"/mnt/dataset0/kyw/closed-loop/sub_model/{sub}/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth"
+        f_encoder = env_path(
+            "MINDPILOT_EEG_ENCODER",
+            Path("checkpoints") / "eeg_encoder" / sub / "ATM_S_reconstruction_scale_0_1000_40.pth",
+        )
+        if not os.path.isfile(f_encoder):
+            raise FileNotFoundError(
+                f"EEG encoder checkpoint not found: {f_encoder}. "
+                "Set MINDPILOT_EEG_ENCODER to a valid checkpoint path."
+            )
         checkpoint = torch.load(f_encoder, map_location=device)
 
         eeg_model = ATMS()  # EEG feature extraction model
@@ -150,9 +185,9 @@ if use_eeg:
 
     elif feature_type == 'clip_img': 
         # Load CLIP-based image embeddings
-        gt_eeg_folder = f'/mnt/dataset0/kyw/closed-loop/syn_eeg_gt'
-        # target_image_embed = "/home/ldy/Closed_loop_optimizing/data/clip_embed/open_clip/00135_pie_image_embeds.pt"
-        # target_image_path = "/mnt/dataset0/ldy/4090_Workspace/4090_THINGS/images_set/test_images/00135_pie/pie_18s.jpg"
+        gt_eeg_folder = env_path(
+            "MINDPILOT_SYN_EEG_GT_DIR", Path("server") / "target_embed" / "syn_eeg_gt"
+        )
 
 #====================== SocketIO Event Handling ======================
 @socketio.on('connect')
@@ -447,6 +482,14 @@ def experiment_2():
                         
                 if not available_indices:  # Skip if no more unprocessed images
                     continue
+
+                if test_set_img_embeds is None:
+                    raise RuntimeError(
+                        "Greedy image selection requires test-set image embeddings. "
+                        "Set MINDPILOT_TEST_IMG_EMBEDS to a .pt file containing "
+                        "an 'img_features' tensor, or place it at "
+                        f"{test_set_img_embeds_path}."
+                    )
                         
                 available_features = test_set_img_embeds[available_indices]
                 
@@ -955,4 +998,6 @@ def send_images_and_collect_ratings_and_eeg(image_paths, save_dir, num_of_events
     return processed_event_data_list
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=45525)
+    host = os.environ.get("MINDPILOT_HOST", "0.0.0.0")
+    port = int(os.environ.get("MINDPILOT_PORT", "45525"))
+    socketio.run(app, host=host, port=port)

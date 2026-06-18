@@ -18,10 +18,6 @@ import json
 import pandas as pd
 from datetime import datetime
 
-# proxy = 'http://127.0.0.1:7881'
-# os.environ['http_proxy'] = proxy
-# os.environ['https_proxy'] = proxy
-
 import numpy as np
 import torch
 import random
@@ -32,8 +28,9 @@ import torchvision.transforms as transforms
 
 import seaborn as sns
 
-sys.path.append('/home/ldy/Workspace/Closed_loop_optimizing')
-sys.path.append('/home/ldy/Workspace/Closed_loop_optimizing/model')
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from model.utils import load_model_encoder, generate_eeg
 from model.custom_pipeline_low_level import Generator4Embeds
@@ -53,8 +50,11 @@ generator = Generator4Embeds(device=device)
 pipe = generator.pipe
 
 # --- Directory Configuration ---
-image_dir = '/home/ldy/Workspace/Closed_loop_optimizing/test_images'
-embed_dir = '/home/ldy/Workspace/Closed_loop_optimizing/data/clip_embed/2025-09-21'
+image_dir = os.environ.get("MINDPILOT_IMAGE_DIR", os.path.join(PROJECT_ROOT, "test_images"))
+embed_dir = os.environ.get(
+    "MINDPILOT_EEG_EMBED_DIR",
+    os.path.join(PROJECT_ROOT, "data", "clip_embed", "2025-09-21"),
+)
 
 image_list = sorted([f for f in os.listdir(image_dir) if f.lower().endswith(('.jpg','.png','.jpeg'))])
 embed_list = sorted([f for f in os.listdir(embed_dir) if f.endswith('_embed.pt')])
@@ -251,11 +251,17 @@ def run_single_experiment(method, target_idx, seed, config):
     # Load EEG model
     sub = 'sub-01'
     dnn = 'alexnet'
-    f_encoder = "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth"
+    f_encoder = os.environ.get(
+        "MINDPILOT_EEG_ENCODER",
+        os.path.join(PROJECT_ROOT, "checkpoints", "eeg_encoder", sub, "ATM_S_reconstruction_scale_0_1000_40.pth"),
+    )
     checkpoint = torch.load(f_encoder, map_location=device, weights_only=False)
     eeg_model = ATMS()
     eeg_model.load_state_dict(checkpoint['eeg_model_state_dict'])
-    encoding_model_path = f'/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/{sub}/synthetic_eeg_data/encoding-end_to_end/dnn-{dnn}/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt'
+    encoding_model_path = os.environ.get(
+        "MINDPILOT_ENCODING_MODEL",
+        os.path.join(PROJECT_ROOT, "checkpoints", "encoding", sub, dnn, "model_state_dict.pt"),
+    )
     
     # Get image pool
     def get_image_pool(image_set_path):
@@ -614,7 +620,10 @@ def main():
         'target_indices': np.linspace(1, 200, 30, dtype=int).tolist(),
         'num_seeds': 1,  # Number of random seeds per method
         'offline_batch_size': 10,  # Offline data batch size
-        'save_path': '/home/ldy/Workspace/Closed_loop_optimizing/outputs/benchmark_offline_generation',
+        'save_path': os.environ.get(
+            "MINDPILOT_OUTPUT_DIR",
+            os.path.join(PROJECT_ROOT, "outputs", "benchmark_offline_generation"),
+        ),
         'methods': ['eeg_guidance', 'target_image_guidance', 'random_generation']
     }
     
@@ -665,4 +674,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

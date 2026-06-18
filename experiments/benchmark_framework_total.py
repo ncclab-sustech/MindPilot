@@ -10,17 +10,15 @@ Compares 7 methods:
   7. CMA-ES                        - Evolution strategy
 """
 
-# CUDA_VISIBLE_DEVICES=1 python benchmark_framework_total.py --config benchmark_config_total.json --exp exp1
+# python benchmark_framework_total.py --config benchmark_config_total.json --exp exp1
 
 
 import os
 import sys
 
-# Important: set environment variables before importing other modules to prevent overwriting
-# If CUDA_VISIBLE_DEVICES is already set via command line, use that value
-if 'CUDA_VISIBLE_DEVICES' not in os.environ:
-    # If not set, use default value (modify here as needed)
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # Default to GPU 0
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 import time
 import json
@@ -34,9 +32,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 import pandas as pd
-
-sys.path.append('/home/ldy/Workspace/Closed_loop_optimizing')
-sys.path.append('/home/ldy/Workspace/Closed_loop_optimizing/model')
 
 @dataclass
 class BenchmarkResult:
@@ -1128,8 +1123,9 @@ class DDPOWrapper(BaseMethod):
         # Import dependencies
         from peft import LoraConfig
         from model.ATMS_retrieval import ATMS, get_eeg_features
-        import sys
-        sys.path.append('/home/ldy/Workspace/guide-stable-diffusion/related_works/d3po/d3po')
+        d3po_path = os.environ.get("MINDPILOT_D3PO_PATH")
+        if d3po_path and d3po_path not in sys.path:
+            sys.path.append(d3po_path)
         
         # Check whether to use shared models
         if shared_models is not None:
@@ -1543,8 +1539,9 @@ class DPOKWrapper(BaseMethod):
         # Import dependencies
         from peft import LoraConfig
         from model.ATMS_retrieval import ATMS, get_eeg_features
-        import sys
-        sys.path.append('/home/ldy/Workspace/guide-stable-diffusion/related_works/d3po/d3po')
+        d3po_path = os.environ.get("MINDPILOT_D3PO_PATH")
+        if d3po_path and d3po_path not in sys.path:
+            sys.path.append(d3po_path)
         
         # Check whether to use shared models
         if shared_models is not None:
@@ -2763,5 +2760,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-

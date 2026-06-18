@@ -1,9 +1,12 @@
 #!/bin/bash
-# Set library path
-export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+set -euo pipefail
 
-# export https_proxy="10.16.11.87:7890"
-# export http_proxy="10.16.11.87:7890"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Set library path
+if [ -n "${CONDA_PREFIX:-}" ]; then
+  export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+fi
 
 # Run benchmark
-CUDA_VISIBLE_DEVICES=5 python /home/ldy/Workspace/Closed_loop_optimizing/experiments/benchmark_offline_generation.py
+python "$SCRIPT_DIR/benchmark_offline_generation.py"

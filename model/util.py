@@ -5,7 +5,10 @@ import os
 import sys
 import time
 from torch import inf
-import wandb
+try:
+    import wandb
+except ImportError:  # Optional dependency used only by wandb_logger.
+    wandb = None
 from sre_constants import CATEGORY
 import torch
 import os
@@ -25,25 +28,16 @@ from natsort import natsorted
 import random
 import matplotlib.pyplot as plt
 
-import sys
-sys.path.append("/mnt/dataset0/kyw/closed-loop")
-
-from CORnet.cornet import CORnet_S
-
-
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# # Load model, training preprocessor and feature extractor
-# vlmodel, preprocess_train, feature_extractor = open_clip.create_model_and_transforms(
-#     model_name = 'ViT-H-14', pretrained = None, precision='fp32', device=device
-# )
-
-# # Load the previously downloaded weight file
-# model_weights_path = "/mnt/repo0/kyw/open_clip_pytorch_model.bin"
-# model_state_dict = torch.load(model_weights_path, map_location=device)
-# vlmodel.load_state_dict(model_state_dict)
-
-# # Set model to evaluation mode
-# vlmodel.eval()
+try:
+    from CORnet.cornet import CORnet_S
+except ImportError:
+    try:
+        import cornet
+    except ImportError:
+        CORnet_S = None
+    else:
+        def CORnet_S():
+            return cornet.cornet_s(pretrained=False)
 
 # EEG signal generation module
 # Define your model structure
@@ -58,6 +52,11 @@ def create_model(device, dnn):
         model = models.alexnet(pretrained=True)
         model.classifier[6] = torch.nn.Linear(4096, 4250) 
     if dnn == 'cornet_s':
+        if CORnet_S is None:
+            raise ImportError(
+                "CORnet-S is required for dnn='cornet_s'. Install cornet or "
+                "use dnn='alexnet'."
+            )
         model = CORnet_S()
         model.decoder = nn.Sequential(
             model.decoder.avgpool,
@@ -259,7 +258,8 @@ def get_image_path(category_idx, image_idx, text_list):
     category_folder = text_list[category_idx]
     # print(category_idx)
     # print(category_folder)
-    folder_path = f"/mnt/dataset0/kyw/closed-loop/image_select/{category_folder}"
+    image_select_dir = os.environ.get("IMAGE_SELECT_DIR", "image_select")
+    folder_path = os.path.join(image_select_dir, category_folder)
     
     image_file = [f for f in sorted(os.listdir(folder_path)) if f.endswith(('.jpg', '.png')) and not f.startswith('._')]
     
@@ -446,16 +446,6 @@ def generate_and_save_eeg_for_all_images(model_path, test_image_list, save_dir, 
         synthetic_eeg = generate_eeg(model, image_tensor, device)
         category = category_list[idx]
         save_eeg_signal(synthetic_eeg, save_dir, idx, category)
-
-    # # Load the previously saved model
-    # # model_path = '/mnt/repo0/kyw/close-loop/sub_model/sub-08/generation/encoding-end_to_end/dnn-alexnet/modeled_time_points-all/pretrained-False/model_state_dict_250hz.pt'
-    # model = load_model_endocer(model_path, device)
-    #  # EEG signal save path
-
-    # # Iterate through each image in the image folder
-    # # image_files = sorted([f for f in os.listdir(image_folder) if f.endswith(('.jpg', '.png'))])
-    # # image_files = natsorted([f for f in os.listdir(image_folder) if f.endswith(('.jpg', '.png')) and not f.startswith('._')])
-    # # image_files = [f for f in os.listdir(image_folder) if f.endswith(('.jpg', '.png')) and not f.startswith('._')]
     # # image_files.sort(key=extract_number)
     # image_files = [img for img in test_image_list]
     # image_files.sort(key=lambda x: extract_number(x))
@@ -903,7 +893,7 @@ def train_one_epoch(model, data_loader, optimizer, device, epoch,
 
         total_loss.append(loss_value)
         total_cor.append(cor)
-        if device == torch.device('cuda:0'):
+        if torch.device(device).type == 'cuda':
             lr = optimizer.param_groups[0]["lr"]
             print('train_loss_step:', np.mean(total_loss), 'lr:', lr, 'cor', np.mean(total_cor))
 
@@ -1025,6 +1015,8 @@ def unpatchify(x, patch_size):
 
 class wandb_logger:
     def __init__(self, config):
+        if wandb is None:
+            raise ImportError("wandb is required for wandb_logger. Install wandb or disable logging.")
         try:
             wandb.init(
                 # Set the project where this run will be logged

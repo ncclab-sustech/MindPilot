@@ -1,8 +1,9 @@
 import os
 
-proxy="10.16.11.87:7890"
-os.environ['http_proxy'] = proxy
-os.environ['https_proxy'] = proxy
+proxy = os.environ.get("MINDPILOT_PROXY")
+if proxy:
+    os.environ['http_proxy'] = proxy
+    os.environ['https_proxy'] = proxy
 
 import numpy as np
 import torch
@@ -16,8 +17,9 @@ import torch.nn.functional as F
 import torch.nn as nn
 from scipy.special import softmax
 from datetime import datetime
-sys.path.append('/home/ldy/Workspace/Closed_loop_optimizing')
-sys.path.append('/home/ldy/Workspace/Closed_loop_optimizing/model')
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 # from torchvision import transforms
 from torchvision import models
 from model.utils import load_model_encoder, generate_eeg, save_eeg_signal
@@ -36,7 +38,7 @@ from safetensors.torch import load_file
 import logging
 logging.getLogger("diffusers").setLevel(logging.WARNING)
 
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 model_type = 'ViT-H-14'
 
@@ -51,8 +53,11 @@ pipe = generator.pipe
 
 
 # Configure image and embed directories
-image_dir = '/home/ldy/Workspace/Closed_loop_optimizing/test_images'
-embed_dir = '/home/ldy/Workspace/Closed_loop_optimizing/data/clip_embed/2025-09-21'
+image_dir = os.environ.get("MINDPILOT_IMAGE_DIR", os.path.join(PROJECT_ROOT, "test_images"))
+embed_dir = os.environ.get(
+    "MINDPILOT_EEG_EMBED_DIR",
+    os.path.join(PROJECT_ROOT, "data", "clip_embed", "2025-09-21"),
+)
 
 # Get all image and embed paths, sorted to ensure one-to-one correspondence
 image_list = sorted([f for f in os.listdir(image_dir) if f.lower().endswith(('.jpg','.png','.jpeg'))])
@@ -76,14 +81,20 @@ def main_loop(target_idx):
     selected_channel_idxes = slice(None)
     random.seed(43)
     dnn = 'alexnet'
-    encoding_model_path = f'/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/EEG-encoding/EEG_encoder/results/{sub}/synthetic_eeg_data/encoding-end_to_end/dnn-{dnn}/modeled_time_points-all/pretrained-True/lr-1e-05__wd-0e+00__bs-064/model_state_dict.pt'
+    encoding_model_path = os.environ.get(
+        "MINDPILOT_ENCODING_MODEL",
+        os.path.join(PROJECT_ROOT, "checkpoints", "encoding", sub, dnn, "model_state_dict.pt"),
+    )
     target_feature = torch.load(target_eeg_embed_path)
-    f_encoder =  "/home/ldy/Workspace/Closed_loop_optimizing/kyw/closed-loop/sub_model/sub-01/diffusion_alexnet/pretrained_True/gene_gene/ATM_S_reconstruction_scale_0_1000_40.pth"
+    f_encoder = os.environ.get(
+        "MINDPILOT_EEG_ENCODER",
+        os.path.join(PROJECT_ROOT, "checkpoints", "eeg_encoder", sub, "ATM_S_reconstruction_scale_0_1000_40.pth"),
+    )
     checkpoint = torch.load(f_encoder, map_location=device)
     eeg_model = ATMS()
     eeg_model.load_state_dict(checkpoint['eeg_model_state_dict'])
 
-    save_path = f"/home/ldy/Workspace/Closed_loop_optimizing/outputs/iclr2026"
+    save_path = os.environ.get("MINDPILOT_OUTPUT_DIR", os.path.join(PROJECT_ROOT, "outputs", "iclr2026"))
     os.makedirs(save_path, exist_ok=True)
 
     def preprocess_image(image_path, device):
@@ -557,11 +568,14 @@ def main_loop(target_idx):
     fit_eegs = []
     fit_rewards = []
     fit_losses = []
-    save_folder = f'/home/ldy/Workspace/Closed_loop_optimizing/outputs/iclr2026'
+    save_folder = save_path
 
-    test_set_img_embeds = torch.load("/mnt/dataset1/ldy/Workspace/FLORA/data_preparing/ViT-H-14_features_test.pt")['img_features'].cpu()
-
-    # test_set_img_embeds = torch.load("/home/ldy/Workspace/Closed_loop_optimizing/data/clip_embed/open_clip/600_image_embeds.pt").cpu()
+    test_feature_path = os.environ.get(
+        "MINDPILOT_TEST_IMAGE_FEATURES",
+        os.path.join(PROJECT_ROOT, "data", "clip_embed", "open_clip", "600_image_embeds.pt"),
+    )
+    test_features = torch.load(test_feature_path)
+    test_set_img_embeds = (test_features['img_features'] if isinstance(test_features, dict) else test_features).cpu()
     # Ensure base directory exists
     os.makedirs(save_folder, exist_ok=True)
     
@@ -795,4 +809,3 @@ if __name__ == '__main__':
     for i in range(200):
         if i<84: continue
         main_loop(i)
-        

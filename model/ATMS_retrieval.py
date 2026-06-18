@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import torch
 from torch.nn import CrossEntropyLoss
@@ -6,8 +7,7 @@ from torch.nn import functional as F
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
-os.environ["WANDB_API_KEY"] = "KEY"
-os.environ["WANDB_MODE"] = 'offline'
+os.environ.setdefault("WANDB_MODE", "offline")
 from itertools import combinations
 
 # import clip
@@ -23,7 +23,6 @@ from einops.layers.torch import Rearrange, Reduce
 from sklearn.metrics import confusion_matrix
 from torch.utils.data import DataLoader, Dataset
 import random
-from util import wandb_logger
 # from braindecode.models import EEGNetv4, ATCNet, EEGConformer, EEGITNet, ShallowFBCSPNet
 import csv
 from torch import Tensor
@@ -40,6 +39,32 @@ from loss import ClipLoss
 import argparse
 from torch import nn
 from torch.optim import AdamW
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    value = value.lower()
+    if value in {"true", "1", "yes", "y", "on"}:
+        return True
+    if value in {"false", "0", "no", "n", "off"}:
+        return False
+    raise argparse.ArgumentTypeError(f"Invalid boolean value: {value}")
+
+
+def get_wandb_logger(config):
+    try:
+        from util import wandb_logger
+    except ImportError as exc:
+        if exc.name == "wandb":
+            raise ImportError(
+                "wandb is required only when --logger true. "
+                "Install wandb or run with --logger false."
+            ) from exc
+        raise
+    return wandb_logger(config)
 
 class Config:
     def __init__(self):
@@ -370,8 +395,9 @@ def evaluate_model(sub, eeg_model, dataloader, device, text_features_all, img_fe
     return average_loss, accuracy, top5_acc
 
 def main_train_loop(sub, current_time, eeg_model, train_dataloader, test_dataloader, optimizer, device, text_features_train_all, text_features_test_all, img_features_train_all, img_features_test_all, config, logger=None):
-    logger = wandb_logger(config) if logger else None
-    logger.watch(eeg_model,logger) 
+    logger = get_wandb_logger(config) if logger else None
+    if logger is not None:
+        logger.watch(eeg_model, logger)
     train_losses, train_accuracies = [], []
     test_losses, test_accuracies = [], []
     v2_accs = []
@@ -383,8 +409,7 @@ def main_train_loop(sub, current_time, eeg_model, train_dataloader, test_dataloa
     best_epoch_info = {}
     results = []  # List to store results for each epoch
     
-    # save_dir = f'/mnt/dataset0/kyw/closed-loop/sub_model/sub-08/diffusion_alexnet/pretrained_True/gene_gene/'
-    save_dir = f'/home/kyw/sub_model/sub-01/diffusion_cornet_s/pretrained_True/true_true/'
+    save_dir = os.path.join(config.output_dir, sub, config.encoder_type)
     os.makedirs(save_dir, exist_ok=True)
     log_file_path = os.path.join(save_dir, "training_log.txt")
 
@@ -393,8 +418,6 @@ def main_train_loop(sub, current_time, eeg_model, train_dataloader, test_dataloa
             # Train the model
             train_loss, train_accuracy, features_tensor = train_model(sub, eeg_model, train_dataloader, optimizer, device, text_features_train_all, img_features_train_all, config=config)
             if (epoch +1) % 5 == 0:    
-                # save_dir = f'/mnt/dataset0/kyw/closed-loop/sub_model/{sub}/diffusion_train_true/'
-                
                 save_path = os.path.join(save_dir, 
             f"ATM_S_reconstruction_scale_0_1000_{epoch+1}.pth")  
                 torch.save({
@@ -468,16 +491,17 @@ def main_train_loop(sub, current_time, eeg_model, train_dataloader, test_dataloa
                 }
 
 
-            logger.log({
-                "Train Loss": train_loss,
-                "Train Accuracy": train_accuracy,
-                "Test Loss": test_loss,
-                "Test Accuracy": test_accuracy,
-                "v2 Accuracy": v2_acc,
-                "v4 Accuracy": v4_acc,
-                "v10 Accuracy": v10_acc,
-                "Epoch": epoch
-            })
+            if logger is not None:
+                logger.log({
+                    "Train Loss": train_loss,
+                    "Train Accuracy": train_accuracy,
+                    "Test Loss": test_loss,
+                    "Test Accuracy": test_accuracy,
+                    "v2 Accuracy": v2_acc,
+                    "v4 Accuracy": v4_acc,
+                    "v10 Accuracy": v10_acc,
+                    "Epoch": epoch
+                })
 
             print(f"Epoch {epoch + 1}/{config.epochs} - Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}, Top5 Accuracy: {top5_acc:.4f}")
             print(f"Epoch {epoch + 1}/{config.epochs} - v2 Accuracy:{v2_acc} - v4 Accuracy:{v4_acc} - v10 Accuracy:{v10_acc} - v50 Accuracy:{v50_acc} - v100 Accuracy:{v100_acc}")
@@ -543,7 +567,8 @@ def main_train_loop(sub, current_time, eeg_model, train_dataloader, test_dataloa
     # Add main title
     plt.suptitle('pos_img_text', fontsize=16, y=1.05)
     plt.savefig('pos_img_text')
-    logger.finish()
+    if logger is not None:
+        logger.finish()
     return results
 
 import datetime
@@ -551,27 +576,52 @@ import datetime
 def main():
     # Use argparse to parse the command-line arguments
     parser = argparse.ArgumentParser(description='EEG Transformer Training Script')
-    parser.add_argument('--data_path', type=str, default="/home/ldy/4090_Workspace/4090_THINGS/Preprocessed_data_250Hz", help='Path to the EEG dataset')
-    parser.add_argument('--output_dir', type=str, default='./outputs/contrast', help='Directory to save output results')    
+    parser.add_argument(
+        '--data_path',
+        type=str,
+        default=os.environ.get("EEG_DATA_DIR", str(REPO_ROOT / "data" / "Preprocessed_data_250Hz")),
+        help='Path to the EEG dataset'
+    )
+    parser.add_argument(
+        '--image_set_dir',
+        type=str,
+        default=os.environ.get("IMAGE_SET_DIR", str(REPO_ROOT / "data" / "images_set")),
+        help='Directory containing training_images/ and test_images/'
+    )
+    parser.add_argument(
+        '--feature_cache_dir',
+        type=str,
+        default=os.environ.get("FEATURE_CACHE_DIR", str(REPO_ROOT / "data" / "clip_features")),
+        help='Directory for cached OpenCLIP text/image features'
+    )
+    parser.add_argument(
+        '--openclip_weight',
+        type=str,
+        default=os.environ.get("OPENCLIP_WEIGHT"),
+        help='Optional local OpenCLIP checkpoint'
+    )
+    parser.add_argument('--output_dir', type=str, default=str(REPO_ROOT / 'outputs' / 'contrast'), help='Directory to save output results')
     parser.add_argument('--project', type=str, default="train_pos_img_text_rep", help='WandB project name')
     parser.add_argument('--entity', type=str, default="sustech_rethinkingbci", help='WandB entity name')
     parser.add_argument('--name', type=str, default="lr=3e-4_img_pos_pro_eeg", help='Experiment name')
     parser.add_argument('--lr', type=float, default=3e-4, help='Learning rate')
     parser.add_argument('--epochs', type=int, default=40, help='Number of epochs')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
-    parser.add_argument('--logger', type=bool, default=True, help='Enable WandB logging')
-    parser.add_argument('--gpu', type=str, default='cuda:1', help='GPU device to use')
-    parser.add_argument('--device', type=str, choices=['cpu', 'gpu'], default='gpu', help='Device to run on (cpu or gpu)')    
-    parser.add_argument('--insubject', type=bool, default=True, help='In-subject mode or cross-subject mode')
+    parser.add_argument('--logger', type=str2bool, default=True, help='Enable WandB logging')
+    parser.add_argument('--gpu', type=str, default=None, help='Deprecated alias for a CUDA device, e.g. cuda:N')
+    parser.add_argument('--device', type=str, default='auto', help='Torch device: auto, cpu, cuda, cuda:N, etc.')
+    parser.add_argument('--insubject', type=str2bool, default=True, help='In-subject mode or cross-subject mode')
     parser.add_argument('--encoder_type', type=str, default='ATMS', help='Encoder type')
     parser.add_argument('--subjects', nargs='+', default=['sub-01' ])#['sub-01', 'sub-02', 'sub-03', 'sub-04', 'sub-05', 'sub-06', 'sub-07', 'sub-08', 'sub-09', 'sub-10'], help='List of subject IDs (default: sub-01 to sub-10)')    
     args = parser.parse_args()
 
     # Set device based on the argument
-    if args.device == 'gpu' and torch.cuda.is_available():
-        device = torch.device(args.gpu)
+    if args.device == 'auto':
+        device = torch.device(args.gpu or ('cuda' if torch.cuda.is_available() else 'cpu'))
+    elif args.device == 'gpu':
+        device = torch.device(args.gpu or ('cuda' if torch.cuda.is_available() else 'cpu'))
     else:
-        device = torch.device('cpu')
+        device = torch.device(args.device)
 
     subjects = args.subjects        
     current_time = datetime.datetime.now().strftime("%m-%d_%H-%M")
@@ -583,11 +633,45 @@ def main():
         optimizer = AdamW(itertools.chain(eeg_model.parameters()), lr=args.lr)
 
         if args.insubject:
-            train_dataset = EEGDataset(args.data_path, subjects=[sub], train=True)
-            test_dataset = EEGDataset(args.data_path, subjects=[sub], train=False)
+            train_dataset = EEGDataset(
+                args.data_path,
+                subjects=[sub],
+                train=True,
+                image_set_dir=args.image_set_dir,
+                feature_cache_dir=args.feature_cache_dir,
+                model_weights_path=args.openclip_weight,
+                device=device,
+            )
+            test_dataset = EEGDataset(
+                args.data_path,
+                subjects=[sub],
+                train=False,
+                image_set_dir=args.image_set_dir,
+                feature_cache_dir=args.feature_cache_dir,
+                model_weights_path=args.openclip_weight,
+                device=device,
+            )
         else:
-            train_dataset = EEGDataset(args.data_path, exclude_subject=sub, subjects=subjects, train=True)
-            test_dataset = EEGDataset(args.data_path, exclude_subject=sub, subjects=subjects, train=False)
+            train_dataset = EEGDataset(
+                args.data_path,
+                exclude_subject=sub,
+                subjects=subjects,
+                train=True,
+                image_set_dir=args.image_set_dir,
+                feature_cache_dir=args.feature_cache_dir,
+                model_weights_path=args.openclip_weight,
+                device=device,
+            )
+            test_dataset = EEGDataset(
+                args.data_path,
+                exclude_subject=sub,
+                subjects=subjects,
+                train=False,
+                image_set_dir=args.image_set_dir,
+                feature_cache_dir=args.feature_cache_dir,
+                model_weights_path=args.openclip_weight,
+                device=device,
+            )
 
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
         test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_workers=0, drop_last=True)
@@ -601,11 +685,9 @@ def main():
                                   text_features_train_all, text_features_test_all, img_features_train_all, img_features_test_all, config=args, logger=args.logger)
 
 
-        # Save results to a CSV file
-        # results_dir = os.path.join(args.output_dir, args.encoder_type, sub, current_time)
-        save_dir ='/home/kyw/sub_model/sub-01/diffusion_cornet_s/pretrained_True/true_true'
-        # '/home/kyw/sub_model/sub-08/diffusion_cornet_s/pretrained_True/true_gene'
-        results_file = f"{save_dir}/{args.encoder_type}.csv" #if config['insubject'] else f'./outputs/{config["encoder_type"]}_cross_exclude_{sub}.csv'
+        save_dir = os.path.join(args.output_dir, sub, args.encoder_type)
+        os.makedirs(save_dir, exist_ok=True)
+        results_file = os.path.join(save_dir, f"{args.encoder_type}.csv")
         # Extract the directory part of the file path
         
         results_dir = os.path.dirname(results_file)

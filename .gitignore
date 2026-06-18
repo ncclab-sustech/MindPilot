@@ -1,1 +1,43 @@
 .history/
+
+# Python/runtime artifacts
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Local environments and secrets
+.env
+.env.*
+!.env.example
+
+# Generated logs and experiment outputs
+*.log
+outputs/
+benchmark_results*/
+wandb/
+runs/
+
+# MindPilot encoding pipeline: keep source code, exclude generated assets.
+encoding/DNNs/
+encoding/images_set/
+encoding/pretrain_weights/*
+!encoding/pretrain_weights/
+!encoding/pretrain_weights/download_pretrain_weights.py
+encoding/sub-*/
+encoding/synthesizing_eeg_data/logs/
+encoding/synthesizing_eeg_data/correlation_results/
+
+# Large model/data/checkpoint artifacts
+*.npy
+*.npz
+*.pt
+*.pth
+*.pth.tar
+*.ckpt
+*.safetensors
+*.bin
+*.h5
+*.hdf5
+*.pkl
+*.tar
+*.tar.gz

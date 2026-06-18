@@ -17,6 +17,7 @@ dependencies:
   - scikit-learn
   - scipy
   - seaborn
+  - tqdm
   - flask
   - sqlalchemy
   - pillow
@@ -102,4 +103,9 @@ dependencies:
     - murmurhash==1.0.10
     - nbformat==5.7.0
     - networkx==3.2.1
-
+    - open-clip-torch==2.24.0
+    - pingouin==0.5.4
+    - statsmodels==0.14.1
+    - tensorboard==2.15.1
+    - timm==0.9.12
+    - transformers==4.36.2

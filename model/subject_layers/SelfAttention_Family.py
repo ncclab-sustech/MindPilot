@@ -2,7 +2,35 @@ import torch
 import torch.nn as nn
 import numpy as np
 from math import sqrt
-from utils_s.masking import TriangularCausalMask, ProbMask
+try:
+    from utils_s.masking import TriangularCausalMask, ProbMask
+except ImportError:
+    class TriangularCausalMask:
+        def __init__(self, B, L, device="cpu"):
+            mask_shape = [B, 1, L, L]
+            self._mask = torch.triu(
+                torch.ones(mask_shape, dtype=torch.bool, device=device), diagonal=1
+            )
+
+        @property
+        def mask(self):
+            return self._mask
+
+    class ProbMask:
+        def __init__(self, B, H, L, index, scores, device="cpu"):
+            mask = torch.ones(L, scores.shape[-1], dtype=torch.bool, device=device).triu(1)
+            mask_ex = mask[None, None, :].expand(B, H, L, scores.shape[-1])
+            indicator = mask_ex[
+                torch.arange(B, device=device)[:, None, None],
+                torch.arange(H, device=device)[None, :, None],
+                index,
+                :,
+            ]
+            self._mask = indicator.view(scores.shape).to(device)
+
+        @property
+        def mask(self):
+            return self._mask
 # from reformer_pytorch import LSHSelfAttention
 from einops import rearrange, repeat
 

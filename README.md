@@ -16,6 +16,7 @@
 
 ## 📰 News
 
+- 🧠 **2026.06.19**: We add the [encoding](encoding/README.md) directory for training proxy models.
 - 🚀 **2026.03.08**: We update the codebase and [Hugging Face](https://huggingface.co/datasets/LidongYang/Mindpilot) resources.
 - 📄 **2026.02.11**: We upload the [arXiv](https://arxiv.org/abs/2602.10552) paper and release the [code repository](https://github.com/ncclab-sustech/MindPilot).
 - 🎉 **2026.01.26**: Our paper is accepted to [ICLR 2026](https://openreview.net/forum?id=7jdmXx869Q).
@@ -109,22 +110,27 @@ Download the additional datasets from the following sources:
 
 ## 🎓 Usage
 
+### 0. EEG Encoding Pipeline
+
+The reproducible EEG encoding implementation lives in [`encoding/`](encoding/README.md).
+It includes DNN feature extraction, PCA, linearizing encoding training, and
+evaluation scripts. Large datasets, feature arrays, pretrained weights, and
+generated results are intentionally excluded from Git and must be provided via
+the documented environment variables.
+
 ### 1. Train EEG Readout Model
 
 Train a neural network to predict EEG responses from visual features:
 
 ```bash
-python model/end_to_end.py \
+bash encoding/synthesizing_eeg_data/train.sh \
+    --sub 1 \
     --dnn alexnet \
-    --sub 10 \
-    --modeled_time_points all \
-    --pretrained False \
-    --epochs 50 \
-    --lr 1e-5 \
-    --weight_decay 0. \
-    --batch_size 64 \
-    --save_trained_models True \
-    --project_dir eeg_encoding/
+    --subjects within \
+    --pretrained true \
+    --layers all \
+    --brain_regions occipital_parietal \
+    --n_components 1000
 ```
 
 
